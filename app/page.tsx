@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowUpLeft, Check, Copy, Heart, Inbox, LockKeyhole, MessageCircle, ShieldCheck, Sparkles, Star, UserRound } from 'lucide-react'
+import { ArrowUpLeft, Check, Copy, Download, Heart, Inbox, LockKeyhole, MessageCircle, ShieldCheck, Sparkles, Star, UserRound } from 'lucide-react'
 
 const sampleMessages = [
   { id: 1, text: 'أحب طريقتك في تشجيع كل من حولك. وجودك يفرق فعلًا.', type: 'رسالة خاصة', time: 'منذ ٨ دقائق' },
@@ -43,6 +43,16 @@ export default function Home() {
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#f8f6fc] p-3"><div className="min-w-0"><small className="text-[10px] text-[#8b90a0]">رابطك الشخصي</small><p className="truncate text-xs font-semibold text-[#514b64]" dir="ltr">sarehny.com/yourname</p></div><button onClick={async () => { try { await navigator.clipboard.writeText('https://sarehny.com/yourname'); setCopied(true); window.setTimeout(() => setCopied(false), 1800) } catch { setCopied(false) } }} className="mr-3 flex shrink-0 items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#7357c8] shadow-sm">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'تم النسخ' : 'نسخ الرابط'}</button></div>
           <div className="mt-5 flex items-center justify-between rounded-2xl border border-dashed border-[#ddd7eb] px-4 py-3"><span><strong className="block text-sm">نسخة Android</strong><small className="text-xs text-[#8b90a0]">مصدر Flutter، وليس WebView</small></span><span className="size-2 rounded-full bg-[#2f8f76]" aria-label="تصميم RTL" /></div>
         </section>
+      </section>
+      <section aria-labelledby="download-title" className="mx-auto -mt-2 mb-10 flex w-full max-w-3xl flex-col items-center justify-between gap-5 rounded-3xl border border-[#e9e6f1] bg-white px-5 py-6 shadow-sm sm:flex-row sm:px-7">
+        <div className="text-center sm:text-right">
+          <h2 id="download-title" className="text-lg font-extrabold">جاهز للتجربة على Android Studio؟</h2>
+          <p className="mt-1 text-sm leading-6 text-[#73788a]">حمّل ملفات Flutter وPHP API وAndroid كاملة بصيغة ZIP، ثم اتبع دليل البناء المرفق.</p>
+        </div>
+        <a href="/downloads/saraha-android-project.zip" download className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
+          <Download size={17} aria-hidden="true" />
+          تنزيل المشروع ZIP
+        </a>
       </section>
       <footer className="mx-auto max-w-6xl px-5 pb-9 text-center text-xs leading-6 text-[#989cac] sm:px-8">هذه معاينة تفاعلية للتصميم ببيانات تجريبية فقط. تسجيل الدخول والبيانات الحقيقية تعمل من تطبيق Flutter بعد نشر API على الاستضافة.</footer>
     </main>
