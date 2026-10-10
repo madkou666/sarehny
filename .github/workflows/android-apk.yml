@@ -92,17 +92,6 @@ jobs:
                   raise SystemExit('Provide an HTTPS staging URL ending in /api/v1/; production hosts are not accepted.')
           PY
 
-      - name: Verify Android connection to the production PHP API
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            cd mobile
-            flutter test integration_test/production_connection_test.dart
-
       - name: Require a dedicated staging target and credentials
         if: github.event_name == 'workflow_dispatch' && inputs.run_staging_integration
         env:
@@ -160,6 +149,18 @@ jobs:
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Verify Android connection to the production PHP API
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            cd mobile
+            flutter test integration_test/production_connection_test.dart
 
       - name: Summarize APK configuration
         if: success()
