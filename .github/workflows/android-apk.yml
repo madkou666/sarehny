@@ -5,6 +5,7 @@ on:
     paths:
       - 'mobile/**'
       - 'deployment/api/v1/**'
+      - 'deployment/hostinger-api-v1.zip'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
     inputs:
@@ -29,6 +30,19 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Set up PHP 8.2 for syntax validation
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Lint PHP API and verify delivery archive
+        run: |
+          php -l deployment/api/v1/index.php
+          source_hash=$(sha256sum deployment/api/v1/index.php | cut -d ' ' -f 1)
+          archive_hash=$(unzip -p deployment/hostinger-api-v1.zip api/v1/index.php | sha256sum | cut -d ' ' -f 1)
+          test "$source_hash" = "$archive_hash"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4

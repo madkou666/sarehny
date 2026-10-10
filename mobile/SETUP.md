@@ -65,7 +65,7 @@
 
 الإعداد في `mobile/lib/src/api_config.dart` هو `API_BASE_URL`، وقيمته الافتراضية تبقى فارغة عمدًا. دون إعداد صريح، يرفض العميل الطلب قبل استخدام Dio. يرسل العميل الطلبات إلى `index.php?r=...`؛ يحدد مسار المجلد المنشور مكان `index.php`، وتسمح قواعد `.htaccess` داخل مجلد API بتوجيه المسارات البديلة.
 
-عنوان API الافتراضي فارغ عمدًا؛ لا يتصل التطبيق بخادم قبل تمرير `API_BASE_URL` صراحةً. في CI يبني الدفع التلقائي APK دون عنوان API، أي نسخة آمنة للتشغيل دون اتصال بالخادم. يمكن تشغيل Workflow يدويًا وإدخال عنوان Staging فقط بصيغة HTTPS وينتهي بـ`/api/v1/` ويحتوي اسم المضيف على `stage` أو `staging` أو `test` أو `dev`؛ يرفض Workflow مضيف `sarehny.com` الإنتاجي. لا يرسل التحليل أو الاختبارات أو البناء أي طلب API. للتطوير المحلي مرّر عنوان خادم الاختبار الذي شغّلته فعليًا، مثل `--dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1/` للمحاكي. السماح باتصالات HTTP موجود في Manifest نسخة **debug فقط**؛ Manifest إصدار release يرفض HTTP.
+عنوان API الافتراضي فارغ عمدًا؛ لا يتصل التطبيق بخادم قبل تمرير `API_BASE_URL` صراحةً. في CI يبني الدفع التلقائي APK دون عنوان API، أي نسخة آمنة للتشغيل دون اتصال بالخادم. يمكن تشغيل Workflow يدوي��ا وإدخال عنوان Staging فقط بصيغة HTTPS وينتهي بـ`/api/v1/` ويحتوي اسم المضيف على `stage` أو `staging` أو `test` أو `dev`؛ يرفض Workflow مضيف `sarehny.com` الإنتاجي. لا يرسل التحليل أو الاختبارات أو البناء أي طلب API. للتطوير المحلي مرّر عنوان خادم الاختبار الذي شغّلته فعليًا، مثل `--dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1/` للمحاكي. السماح باتصالات HTTP موجود في Manifest نسخة **debug فقط**؛ Manifest إصدار release يرفض HTTP.
 
 ## 5) فحوصات التطبيق وبناء Android
 
@@ -115,7 +115,7 @@ flutter.sdk=/المسار/إلى/flutter
 
 ## 7) بناء APK تلقائيًا وتنزيله دون Android Studio
 
-سير GitHub Actions في `.github/workflows/android-apk.yml` يشغّل `flutter pub get`, `flutter analyze`, `flutter test` دون إعداد API، ثم يبني APK debug آمنًا دون اتصال بخادم ويرفعه باسم `sarehny-android-debug-<رقم التشغيل>`. يبدأ عند تغييرات `mobile/` أو `deployment/api/v1/` أو ملف Workflow؛ ويُشغّل يدويًا من **Actions → Build Android APK (staging or offline-safe) → Run workflow**، مع ترك `api_base_url` فارغًا إلى أن تتوفر بيئة Staging. الـArtifact صالح 14 يومًا، لكنه debug وغير موقّع وليس إصدارًا جاهزًا للنشر. لا يرفع الـWorkflow ملفات إلى Hostinger أو يغيّر قاعدة البيانات.
+سير GitHub Actions في `.github/workflows/android-apk.yml` يشغّل PHP syntax lint، ويتحقق من تطابق أرشيف API مع الملف المصدر، ثم يشغّل `flutter pub get`, `flutter analyze`, `flutter test` دون إعداد API ويبني APK debug آمنًا دون اتصال بخادم ويرفعه باسم `sarehny-android-debug-<رقم التشغيل>`. يبدأ عند تغييرات `mobile/` أو `deployment/api/v1/` أو `deployment/hostinger-api-v1.zip` أو ملف Workflow؛ ويُشغّل يدويًا من **Actions → Build Android APK (staging or offline-safe) → Run workflow**، مع ترك `api_base_url` فارغًا إلى أن تتوفر بيئة Staging. الـArtifact صالح 14 يومًا، لكنه debug وغير موقّع وليس إصدارًا جاهزًا للنش��. لا يرفع الـWorkflow ملفات إلى Hostinger أو يغيّر قاعدة البيانات.
 
 **حدود التحقق:** نجاح التحليل والاختبارات والبناء يثبت سلامة الكود وإعداد عنوان API وقت البناء فقط. اختبارات CI تعمل دون عنوان API ولا تتصل بالموقع. لا يثبت ذلك أن endpoint متاح أو أن تسجيل الدخول وجلب الرسائل وإرسالها يعمل؛ يلزم اختبار اتصال واستجابات حقيقية منفصل قبل إعلان نجاح الربط.
 
@@ -125,10 +125,12 @@ flutter.sdk=/المسار/إلى/flutter
 - أو استخدم GitHub المتصل مع المشروع، واستنسخ الفرع الذي يحتوي التغييرات.
 - يحجب `.gitignore` ملفات الإعداد ومخرجات Flutter/Gradle ومفاتيح Android وقواعد البيانات المحلية. لا تُدرج `local.properties`, `config.php`, قواعد بيانات أو dumps، ملفات `.env`, مفاتيح توقيع، `google-services.json` أو بيانات مستخدمين في ZIP/Git. `pubspec.lock` غير مولّد هنا؛ يولّده `flutter pub get` في CI قبل التحليل والبناء.
 
-## حالة التحقق في بيئة الإنشاء
+## حالة التحقق وحدودها
 
-يفحص التطبيق `GET index.php?r=session` عند البدء، ويستخدم `POST index.php?r=auth/login` مع حقلي `identifier` و`password` ورمز CSRF، ثم `GET index.php?r=inbox` مع مرشحات وترقيم صفحات. فحص القراءة الحي الأخير إلى `https://sarehny.com/api/v1/index.php?r=session` أعاد `200` و`user: null`، بينما أعاد `GET ...?r=app-theme` الحالة `404` مع `code: not_found`. هذا يؤكد أن عنوان الجلسة متاح، لكنه يثبت أيضًا أن واجهة API المنشورة لا تتضمن مسار المظهر الحالي؛ لم تُختبر مصادقة مستخدم أو عمليات كتابة على الإنتاج.
+نجح GitHub Actions في التشغيل [`38092513406`](https://github.com/madkou666/sarehny/actions/runs/38092513406) على 2026-10-10: `flutter analyze` دون أخطاء، ونجحت الاختبارات العشرة، ثم اكتمل بناء APK debug دون عنوان API ورفع artifact `sarehny-android-debug-16` (79,197,534 بايت). هذا يثبت التحليل واختبارات الوحدة والبناء فقط؛ لم يرسل التشغيل أي طلبات API، ولم ينفذ PHP lint في ذلك التشغيل.
 
-أضافت نسخة المستودع ترقيمًا بالمؤشر للرسائل القديمة، وتحديث الحساب وحذفه، ورفع/حذف الصورة الشخصية، ومرور صفحات الموقع الأصلية ضمن WebView مقيد بالأصل وبجلسة PHP نفسها. هذه التغييرات محلية ولم تُنشر. بعد تجهيز نسخة PHP وقاعدة اختبار منفصلتين، انشر `deployment/api/v1/index.php` و`deployment/api/v1/.htaccess` إلى Staging فقط، ثم اختبر `/session` و`/app-theme` ورفع صورة اصطناعية وحذفها وحالات الصلاحيات. لا ترفع إلى Hostinger الإنتاجي ولا تغيّر قاعدة البيانات الأصلية. أرشيف `deployment/hostinger-api-v1.zip` يجب أن يطابق الملفين بعد أي تحديث، ولا ينفذ هذا المشروع أي رفع تلقائي.
+أُضيف الآن إلى CI فحص صياغة PHP للـAPI والتحقق من تطابق `deployment/hostinger-api-v1.zip` مع مصدره؛ ينتظر تأكيدهما من تشغيل CI التالي. أما اختبار الجلسة وCSRF والحسابات والكتابة/الحذف ورفع الصور وصلاحيات الإدارة وWebView فيلزم له staging منفصل وقاعدة اختبار وحسابات اصطناعية؛ لم يتوفر ذلك، لذا تبقى اختبارات التكامل هذه غير منفذة. لم يُختبر التطبيق على جهاز Android فعلي.
 
-لم تتوفر أوامر `php` أو `flutter` أو `dart` في بيئة الإنشاء، لذلك لم يمكن تشغيل فحص PHP أو `flutter analyze` أو الاختبارات أو بناء APK. كما لم تُختبر شاشة Flutter على جهاز Android أو بحساب/بيانات رسائل قديمة. يلزم تشغيل هذه الفحوص ف�� بيئة Flutter، ثم إجراء اختبار سلوكي على قاعدة اختبار آمنة قبل اعتبار العمل منشورًا أو مكتملًا.
+فحص قراءة تاريخي فقط إلى `https://sarehny.com/api/v1/index.php?r=session` أعاد `200` و`user: null`، بينما أعاد `GET ...?r=app-theme` `404 not_found` في وقت الفحص. هذه ليست نتيجة حديثة ولا إثباتًا لنسخة API المعدلة؛ لم تُجرَ مصادقة مستخدم أو عمليات كتابة على الإنتاج.
+
+لم تُنشر تغييرات API إلى Hostinger ولم تُعدّل قاعدة البيانات. لإتمام التكامل، يلزم نشر `deployment/api/v1/index.php` و`deployment/api/v1/.htaccess` إلى staging معزول وقاعدة اختبار، ثم اختبار `/session` و`/app-theme` ورفع صورة اصطناعية وحذفها وحالات الصلاحيات. لا ترفع إلى الإنتاج ولا تغيّر قاعدة البيانات الأصلية دون موافقة واختبار منفصل.
