@@ -14,6 +14,11 @@ on:
         required: false
         type: string
         default: ''
+      run_staging_integration:
+        description: 'Run the Android app against the isolated staging API using repository secrets.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -87,6 +92,45 @@ jobs:
                   raise SystemExit('Provide an HTTPS staging URL ending in /api/v1/; production hosts are not accepted.')
           PY
 
+      - name: Require a dedicated staging target and credentials
+        if: github.event_name == 'workflow_dispatch' && inputs.run_staging_integration
+        env:
+          API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
+          STAGING_USERNAME: ${{ secrets.SAREHNY_STAGING_USERNAME }}
+          STAGING_PASSWORD: ${{ secrets.SAREHNY_STAGING_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          value = os.environ.get('API_BASE_URL', '').strip()
+          username = os.environ.get('STAGING_USERNAME', '')
+          password = os.environ.get('STAGING_PASSWORD', '')
+          parsed = urlparse(value)
+          host = (parsed.hostname or '').lower()
+          is_staging_host = any(part in host for part in ('stage', 'staging', 'test', 'dev'))
+          if not value or not username or not password:
+              raise SystemExit('Staging integration requires api_base_url plus SAREHNY_STAGING_USERNAME and SAREHNY_STAGING_PASSWORD GitHub secrets.')
+          if parsed.scheme != 'https' or not host or not parsed.path.rstrip('/').endswith('/api/v1') or parsed.query or parsed.fragment or parsed.username or parsed.password or not is_staging_host:
+              raise SystemExit('The staging integration accepts only an HTTPS staging/test/dev host ending in /api/v1/.')
+          PY
+
+      - name: Run Android end-to-end test against staging
+        if: github.event_name == 'workflow_dispatch' && inputs.run_staging_integration
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          API_BASE_URL: ${{ github.event.inputs.api_base_url }}
+          STAGING_USERNAME: ${{ secrets.SAREHNY_STAGING_USERNAME }}
+          STAGING_PASSWORD: ${{ secrets.SAREHNY_STAGING_PASSWORD }}
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            cd mobile
+            flutter test integration_test/staging_smoke_test.dart --dart-define="API_BASE_URL=$API_BASE_URL" --dart-define="STAGING_USERNAME=$STAGING_USERNAME" --dart-define="STAGING_PASSWORD=$STAGING_PASSWORD"
+
       - name: Build debug APK for staging or offline-safe use
         working-directory: mobile
         env:
@@ -105,16 +149,19 @@ jobs:
         if: success()
         env:
           API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
+          RUN_STAGING_INTEGRATION: ${{ inputs.run_staging_integration || false }}
         run: |
           {
             echo '## Android debug APK build complete'
             echo ''
             echo 'Download the `sarehny-android-debug-${{ github.run_number }}` artifact from this workflow run.'
             echo 'Flutter analysis, unit/widget tests, and the debug APK build completed successfully.'
-            if [ -n "$API_BASE_URL" ]; then
-              echo 'This APK is configured for the explicitly supplied staging URL. CI did not send API requests to it.'
+            if [ "$RUN_STAGING_INTEGRATION" = "true" ]; then
+              echo 'The Android emulator staging integration test completed successfully against the explicitly supplied staging URL.'
+            elif [ -n "$API_BASE_URL" ]; then
+              echo 'This APK is configured for the explicitly supplied staging URL, but no live API requests were made.'
             else
               echo 'No API URL was configured; this is an offline-safe build and it will not connect to a server.'
             fi
-            echo 'This does not verify login, messages, or server integration. The artifact is a debug APK, not a signed release build.'
+            echo 'The artifact is a debug APK, not a signed release build.'
           } >> "$GITHUB_STEP_SUMMARY"
