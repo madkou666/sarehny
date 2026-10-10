@@ -18,9 +18,30 @@ class _SarehnyAppState extends State<SarehnyApp> {
   final ApiClient _api = ApiClient();
   late Future<Map<String, dynamic>> _bootstrap;
   AppUser? _user;
+  SarehnyPalette _palette = SarehnyPalette.defaults;
 
   @override
-  void initState() { super.initState(); _bootstrap = _api.session(); }
+  void initState() {
+    super.initState();
+    _bootstrap = _api.session();
+    _initializeTheme();
+  }
+
+  Future<void> _initializeTheme() async {
+    try {
+      await _bootstrap;
+    } catch (_) {}
+    await _refreshTheme();
+  }
+
+  Future<void> _refreshTheme() async {
+    try {
+      final data = await _api.appTheme();
+      final value = data['theme'];
+      if (!mounted || value is! Map<String, dynamic>) return;
+      setState(() => _palette = SarehnyPalette.fromServer(value));
+    } catch (_) {}
+  }
 
   void _setUser(AppUser? user) => setState(() => _user = user);
 
@@ -35,7 +56,7 @@ class _SarehnyAppState extends State<SarehnyApp> {
         locale: const Locale('ar'),
         supportedLocales: const [Locale('ar'), Locale('en')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: buildSarehnyTheme(),
+        theme: buildSarehnyTheme(_palette),
         home: FutureBuilder<Map<String, dynamic>>(
           future: _bootstrap,
           builder: (context, snapshot) {
@@ -44,7 +65,10 @@ class _SarehnyAppState extends State<SarehnyApp> {
               return _OfflineScreen(
                 apiBaseUrl: _api.baseUrl,
                 error: snapshot.error!,
-                onRetry: () => setState(() => _bootstrap = _api.session()),
+                onRetry: () {
+                  setState(() => _bootstrap = _api.session());
+                  _initializeTheme();
+                },
               );
             }
             if (snapshot.hasData) {
@@ -98,7 +122,7 @@ class _SplashScreen extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: Scaffold(
           body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 68, height: 68, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(22)), child: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 32)),
+            Container(width: 68, height: 68, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(22)), child: Icon(Icons.lock_outline_rounded, color: Theme.of(context).colorScheme.onPrimary, size: 32)),
             const SizedBox(height: 18),
             Text('صراحة', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 22),
@@ -129,14 +153,14 @@ class _OfflineScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.cloud_off_outlined, size: 48, color: SarehnyColors.primary),
+                  Icon(Icons.cloud_off_outlined, size: 48, color: Theme.of(context).extension<SarehnyPalette>()!.primary),
                   const SizedBox(height: 16),
                   Text('تعذّر الاتصال بخادم صراحة', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
                     error.toString(),
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).extension<SarehnyPalette>()!.muted),
                   ),
                   if (apiBaseUrl.isNotEmpty) ...[
                     const SizedBox(height: 12),

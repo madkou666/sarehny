@@ -84,11 +84,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 62,
                             height: 62,
                             decoration: BoxDecoration(
-                              color: SarehnyColors.primary,
+                              color: Theme.of(context).extension<SarehnyPalette>()!.primary,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Icon(Icons.lock_outline_rounded,
-                                color: Colors.white, size: 29),
+                            child: Icon(Icons.lock_outline_rounded,
+                                color: Theme.of(context).colorScheme.onPrimary, size: 29),
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(color: SarehnyColors.muted),
+                              ?.copyWith(color: Theme.of(context).extension<SarehnyPalette>()!.muted),
                         ),
                         const SizedBox(height: 28),
                         if (_registering) ...[
@@ -204,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F1),
+                              color: Theme.of(context).extension<SarehnyPalette>()!.danger.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
@@ -212,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(color: SarehnyColors.danger),
+                                  ?.copyWith(color: Theme.of(context).extension<SarehnyPalette>()!.danger),
                             ),
                           ),
                         ],
@@ -220,11 +220,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         FilledButton(
                           onPressed: _busy ? null : _submit,
                           child: _busy
-                              ? const SizedBox(
+                              ? SizedBox(
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
+                                      strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                                 )
                               : Text(_registering ? 'إنشاء الحساب' : 'تسجيل الدخول'),
                         ),

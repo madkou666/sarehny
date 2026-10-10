@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_config.dart';
@@ -77,6 +79,30 @@ class ApiClient {
     } finally {
       await _storage.delete(key: 'sarehny_php_session');
       _csrf = null;
+    }
+  }
+
+  Future<Map<String, dynamic>> appTheme() async {
+    try {
+      final data = await _request('GET', 'app-theme');
+      final theme = data['theme'];
+      if (theme is! Map) throw const ApiException('إعدادات المظهر من الخادم غير صالحة.');
+      final value = Map<String, dynamic>.from(theme);
+      try {
+        await _storage.write(key: 'sarehny_app_theme_cache', value: jsonEncode(value));
+      } catch (_) {}
+      return {'theme': value, 'cached': false};
+    } catch (_) {
+      final cached = await _storage.read(key: 'sarehny_app_theme_cache');
+      if (cached != null) {
+        try {
+          final decoded = jsonDecode(cached);
+          if (decoded is Map) {
+            return {'theme': Map<String, dynamic>.from(decoded), 'cached': true};
+          }
+        } catch (_) {}
+      }
+      rethrow;
     }
   }
 

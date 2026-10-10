@@ -64,7 +64,7 @@ class _AccountScreenState extends State<AccountScreen> {
     appBar: AppBar(title: const Text('حسابي')),
     body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 30), children: [
       Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-        CircleAvatar(radius: 38, backgroundColor: SarehnyColors.primarySoft, foregroundImage: widget.user.avatarUrl == null ? null : NetworkImage(widget.user.avatarUrl!), child: widget.user.avatarUrl == null ? Text(_displayName.isEmpty ? 'ص' : String.fromCharCode(_displayName.runes.first), style: const TextStyle(fontSize: 25, color: SarehnyColors.primary, fontWeight: FontWeight.w800)) : null),
+        CircleAvatar(radius: 38, backgroundColor: Theme.of(context).extension<SarehnyPalette>()!.primarySoft, foregroundImage: widget.user.avatarUrl == null ? null : NetworkImage(widget.user.avatarUrl!), child: widget.user.avatarUrl == null ? Text(_displayName.isEmpty ? 'ص' : String.fromCharCode(_displayName.runes.first), style: TextStyle(fontSize: 25, color: Theme.of(context).extension<SarehnyPalette>()!.primary, fontWeight: FontWeight.w800)) : null),
         const SizedBox(height: 12), Text(_displayName, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4), Text('@${widget.user.username}', textDirection: TextDirection.ltr, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 18),
@@ -72,16 +72,16 @@ class _AccountScreenState extends State<AccountScreen> {
       ]))),
       const SizedBox(height: 16),
       Card(child: Column(children: [
-        ListTile(leading: const Icon(Icons.link_rounded, color: SarehnyColors.primary), title: const Text('رابطك الشخصي'), subtitle: Text(widget.user.publicUrl, textDirection: TextDirection.ltr, maxLines: 1, overflow: TextOverflow.ellipsis), trailing: IconButton(tooltip: 'نسخ الرابط', onPressed: _copyLink, icon: const Icon(Icons.copy_rounded))),
+        ListTile(leading: Icon(Icons.link_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('رابطك الشخصي'), subtitle: Text(widget.user.publicUrl, textDirection: TextDirection.ltr, maxLines: 1, overflow: TextOverflow.ellipsis), trailing: IconButton(tooltip: 'نسخ الرابط', onPressed: _copyLink, icon: const Icon(Icons.copy_rounded))),
         const Divider(height: 1, indent: 16, endIndent: 16),
-        ListTile(leading: const Icon(Icons.mail_outline_rounded, color: SarehnyColors.primary), title: const Text('البريد الإلكتروني'), subtitle: Text(widget.user.email, textDirection: TextDirection.ltr)),
+        ListTile(leading: Icon(Icons.mail_outline_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('البريد الإلكتروني'), subtitle: Text(widget.user.email, textDirection: TextDirection.ltr)),
         const Divider(height: 1, indent: 16, endIndent: 16),
-        ListTile(leading: const Icon(Icons.workspace_premium_outlined, color: SarehnyColors.primary), title: const Text('تحليل المرسل'), subtitle: Text(widget.user.insightsEnabled ? 'مفعّل وفق صلاحيات الموقع' : 'غير مفعّل حاليًا'), dense: true),
+        ListTile(leading: Icon(Icons.workspace_premium_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('تحليل المرسل'), subtitle: Text(widget.user.insightsEnabled ? 'مفعّل وفق صلاحيات الموقع' : 'غير مفعّل حاليًا'), dense: true),
       ])),
       const SizedBox(height: 16),
-      Card(child: ListTile(leading: const Icon(Icons.auto_awesome_outlined, color: SarehnyColors.primary), title: const Text('تحليل الشخصية'), subtitle: const Text('وفق ميزات وحصص الموقع الحالية'), trailing: _analyzing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.chevron_left_rounded), onTap: _analyzing ? null : _analyze)),
+      Card(child: ListTile(leading: Icon(Icons.auto_awesome_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('تحليل الشخصية'), subtitle: const Text('وفق ميزات وحصص الموقع الحالية'), trailing: _analyzing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.chevron_left_rounded), onTap: _analyzing ? null : _analyze)),
       const SizedBox(height: 16),
-      Card(child: ListTile(leading: const Icon(Icons.notifications_none_rounded, color: SarehnyColors.muted), title: const Text('إشعارات الرسائل'), subtitle: const Text('إعداد Firebase مطلوب قبل تفعيل Push Android'), trailing: const Icon(Icons.info_outline_rounded), onTap: () => showDialog<void>(context: context, builder: (context) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(title: const Text('إعداد الإشعارات'), content: const Text('الموقع يدعم Web Push فقط. إشعارات Android الأصلية تحتاج مشروع Firebase ومفتاح إرسال آمن وجدولًا لتسجيل الأجهزة؛ لم تُفعّل دون إعداداتك أو ترحيل قاعدة بيانات.'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسنًا'))]))))),
+      Card(child: ListTile(leading: Icon(Icons.notifications_none_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.muted), title: const Text('إشعارات الرسائل'), subtitle: const Text('إعداد Firebase مطلوب قبل تفعيل Push Android'), trailing: const Icon(Icons.info_outline_rounded), onTap: () => showDialog<void>(context: context, builder: (context) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(title: const Text('إعداد الإشعارات'), content: const Text('الموقع يدعم Web Push فقط. إشعارات Android الأصلية تحتاج مشروع Firebase ومفتاح إرسال آمن وجدولًا لتسجيل الأجهزة؛ لم تُفعّل دون إعداداتك أو ترحيل قاعدة بيانات.'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسنًا'))]))))),
       const SizedBox(height: 22), OutlinedButton.icon(onPressed: _confirmLogout, icon: const Icon(Icons.logout_rounded), label: const Text('تسجيل الخروج')),
     ]),
   ));
@@ -96,9 +96,9 @@ class _AnalysisSheet extends StatelessWidget {
     final sections = <(String, List<String>)>[( 'نقاط القوة', values('strengths')), ('سمات متكررة', values('repeated_traits')), ('مجالات للتطوير', values('improvements'))];
     return SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(22, 4, 22, 28), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(result['personality_title'] as String? ?? 'ملامح شخصيتك', style: Theme.of(context).textTheme.headlineMedium),
-      const SizedBox(height: 8), Text('النتيجة: ${result['score'] ?? '—'} / 100', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: SarehnyColors.primary)),
+      const SizedBox(height: 8), Text('النتيجة: ${result['score'] ?? '—'} / 100', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).extension<SarehnyPalette>()!.primary)),
       const SizedBox(height: 16), Text(result['summary'] as String? ?? result['impression'] as String? ?? '', style: Theme.of(context).textTheme.bodyLarge),
-      for (final section in sections) if (section.$2.isNotEmpty) ...[const SizedBox(height: 18), Text(section.$1, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), for (final item in section.$2) Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.circle, size: 7, color: SarehnyColors.primary), const SizedBox(width: 9), Expanded(child: Text(item, style: Theme.of(context).textTheme.bodyMedium))]))],
+      for (final section in sections) if (section.$2.isNotEmpty) ...[const SizedBox(height: 18), Text(section.$1, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), for (final item in section.$2) Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.circle, size: 7, color: Theme.of(context).extension<SarehnyPalette>()!.primary), const SizedBox(width: 9), Expanded(child: Text(item, style: Theme.of(context).textTheme.bodyMedium))]))],
       if (result['advice'] is String && (result['advice'] as String).isNotEmpty) ...[const SizedBox(height: 16), Text('نصيحة', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 6), Text(result['advice'] as String, style: Theme.of(context).textTheme.bodyMedium)],
       const SizedBox(height: 18), Text('تحليل آلي للتأمل فقط، وليس تشخيصًا نفسيًا.', style: Theme.of(context).textTheme.bodySmall),
     ])));

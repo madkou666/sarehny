@@ -77,6 +77,18 @@ function api_message_stats($userId) {
   return $row;
 }
 
+function api_public_theme() {
+  $colors = [];
+  foreach (theme_fields() as $key => $field) {
+    $value = (string)setting('theme_' . $key, $field[1]);
+    $colors[$key] = preg_match('/^#[0-9a-fA-F]{6}$/D', $value) ? strtolower($value) : $field[1];
+  }
+  return [
+    'colors' => $colors,
+    'radius' => max(0, min(24, (int)setting('ui_radius', '8'))),
+  ];
+}
+
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $requestPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/api/v1'), PHP_URL_PATH) ?: '/api/v1';
 $scriptDir = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/api/v1/index.php'))), '/');
@@ -86,6 +98,10 @@ if ($route === '/') $route = '/session';
 
 try {
   if ($method === 'POST') api_require_csrf();
+
+  if ($method === 'GET' && $route === '/app-theme') {
+    api_ok(['theme' => api_public_theme()]);
+  }
 
   if ($method === 'GET' && $route === '/session') {
     $user = me();

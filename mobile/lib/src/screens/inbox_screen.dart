@@ -82,6 +82,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
+    final palette = theme.extension<SarehnyPalette>()!;
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('صندوق الرسائل'), actions: [IconButton(tooltip: 'تحديث الرسائل', onPressed: () => _load(refresh: true), icon: const Icon(Icons.refresh_rounded))]),
       body: RefreshIndicator(onRefresh: () => _load(refresh: true), child: CustomScrollView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), slivers: [
@@ -89,8 +90,8 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7357C8), Color(0xFF947AE0)],
+              gradient: LinearGradient(
+                colors: [palette.primary, palette.secondary],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               ),
@@ -102,18 +103,18 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('مساحتك الخاصة', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      Text('مساحتك الخاصة', style: TextStyle(color: theme.colorScheme.onPrimary.withValues(alpha: 0.75), fontSize: 13)),
                       const SizedBox(height: 5),
                       Text(
                         'رسائل بصراحة،\nوبلا أسماء.',
-                        style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, height: 1.35, fontSize: 21),
+                        style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary, height: 1.35, fontSize: 21),
                       ),
                       const SizedBox(height: 12),
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.shield_outlined, size: 16, color: Colors.white70),
-                          SizedBox(width: 6),
-                          Text('صندوق خاص وآمن', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Icon(Icons.shield_outlined, size: 16, color: theme.colorScheme.onPrimary.withValues(alpha: 0.75)),
+                          const SizedBox(width: 6),
+                          Text('صندوق خاص وآمن', style: TextStyle(color: theme.colorScheme.onPrimary.withValues(alpha: 0.75), fontSize: 12)),
                         ],
                       ),
                     ],
@@ -126,7 +127,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
                     color: Color.fromRGBO(255, 255, 255, .16),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.mark_email_unread_outlined, color: Colors.white, size: 27),
+                  child: Icon(Icons.mark_email_unread_outlined, color: theme.colorScheme.onPrimary, size: 27),
                 ),
               ],
             ),
@@ -139,7 +140,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
           SizedBox(height: 42, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: _filters.length, separatorBuilder: (_, index) => const SizedBox(width: 8), itemBuilder: (context, index) {
             final (value, label) = _filters[index];
             final selected = _filter == value;
-            return ChoiceChip(label: Text(label), selected: selected, onSelected: (_) { setState(() => _filter = value); _load(refresh: true); }, showCheckmark: false, selectedColor: SarehnyColors.primarySoft, labelStyle: TextStyle(color: selected ? SarehnyColors.primary : SarehnyColors.muted, fontWeight: FontWeight.w700));
+            return ChoiceChip(label: Text(label), selected: selected, onSelected: (_) { setState(() => _filter = value); _load(refresh: true); }, showCheckmark: false, selectedColor: palette.primarySoft, labelStyle: TextStyle(color: selected ? palette.primary : palette.muted, fontWeight: FontWeight.w700));
           })),
         ]))),
         if (_loading) const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
@@ -161,7 +162,7 @@ class _StatTile extends StatelessWidget {
   final int value;
   final IconData icon;
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: SarehnyColors.line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, size: 17, color: SarehnyColors.primary), const SizedBox(height: 8), Text('$value', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 19)), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10))]));
+  Widget build(BuildContext context) { final theme = Theme.of(context); final palette = theme.extension<SarehnyPalette>()!; return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13), decoration: BoxDecoration(color: palette.surface, borderRadius: BorderRadius.circular(17), border: Border.all(color: palette.line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, size: 17, color: palette.primary), const SizedBox(height: 8), Text('$value', style: theme.textTheme.titleLarge?.copyWith(fontSize: 19)), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(fontSize: 10))])); }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -172,5 +173,5 @@ class _EmptyState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   @override
-  Widget build(BuildContext context) => ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(28), children: [const SizedBox(height: 36), Icon(icon, size: 48, color: SarehnyColors.primary), const SizedBox(height: 14), Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 8), Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted)), if (actionLabel != null && onAction != null) ...[const SizedBox(height: 18), Center(child: FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)))] ]);
+  Widget build(BuildContext context) { final theme = Theme.of(context); final palette = theme.extension<SarehnyPalette>()!; return ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(28), children: [const SizedBox(height: 36), Icon(icon, size: 48, color: palette.primary), const SizedBox(height: 14), Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleLarge), const SizedBox(height: 8), Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: palette.muted)), if (actionLabel != null && onAction != null) ...[const SizedBox(height: 18), Center(child: FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)))] ]); }
 }
