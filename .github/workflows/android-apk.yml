@@ -1,0 +1,110 @@
+name: Build Android APK
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'HTTPS test API base URL (never use the production site)'
+        required: false
+        default: 'https://test.example.invalid/api/v1/'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyze, test, and build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      API_BASE_URL: ${{ github.event.inputs.api_base_url || 'https://test.example.invalid/api/v1/' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: mobile/android/**/*.gradle*
+
+      - name: Set up Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate test API URL
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          value = os.environ['API_BASE_URL'].strip()
+          parsed = urlsplit(value)
+          host = (parsed.hostname or '').lower().rstrip('.')
+          assert parsed.scheme == 'https', 'Test API URL must use HTTPS.'
+          assert host and host not in {'localhost', '127.0.0.1', '10.0.2.2'}, 'Use an externally reachable test server.'
+          assert host != 'sarehny.com' and not host.endswith('.sarehny.com'), 'Production Sarehny hosts are blocked.'
+          assert parsed.username is None and parsed.password is None, 'Do not put credentials in the URL.'
+          assert not parsed.query and not parsed.fragment, 'Do not put secrets or tokens in URL parameters.'
+          assert parsed.path.rstrip('/').endswith('/api/v1'), 'URL must point to the /api/v1/ API base.'
+          print(f'Building with API host: {host}')
+          PY
+
+      - name: Resolve Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analyze Dart sources
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        working-directory: mobile
+        run: flutter test
+
+      - name: Build installable debug APK
+        working-directory: mobile
+        run: flutter build apk --debug --dart-define="API_BASE_URL=${API_BASE_URL}"
+
+      - name: Install and launch APK in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            adb install -r mobile/build/app/outputs/flutter-apk/app-debug.apk
+            adb shell am start -W -n com.sarehny.sarehny_mobile/.MainActivity
+            adb shell 'for attempt in $(seq 1 20); do if pidof com.sarehny.sarehny_mobile; then exit 0; fi; sleep 1; done; exit 1'
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarehny-android-debug-${{ github.run_number }}
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summarize APK download
+        if: success()
+        run: |
+          {
+            echo '## Android APK is ready'
+            echo ''
+            echo 'Download the `sarehny-android-debug-${{ github.run_number }}` artifact from this workflow run.'
+            echo 'The APK is a debug build. Its API URL is the test URL supplied to the workflow; the default is a non-production placeholder.'
+          } >> "$GITHUB_STEP_SUMMARY"

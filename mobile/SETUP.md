@@ -116,12 +116,22 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://test.exampl
 
 يستخدم API جلسة PHP وCSRF، ويخزن معرّف الجلسة في `flutter_secure_storage`. الواجهة الحالية لا تسجل الصوت أو ترفع الصور أو تنفذ تسجيل الدخول الاجتماعي أو إشعارات FCM؛ لا تدّعي هذه الوظائف أنها تعمل.
 
-## 7) تنزيل المشروع كاملًا أو ربطه بـ GitHub
+## 7) بناء APK تلقائيًا وتنزيله دون Android Studio
 
-- لتنزيل نسخة ZIP تشمل المشروع كاملًا مع المجلدات والمسارات كما هي: من قائمة المشروع أعلى اليمين (زر النقاط الثلاث) اختر **Download ZIP**. بعد فك الضغط، افتح المجلد `mobile/` في الطرفية الخارجية واتبع خطوات البناء أعلاه. تأكد أن الأرشيف يحتوي `deployment/api/v1/` و`mobile/android/gradlew*` و`mobile/android/gradle/wrapper/gradle-wrapper.jar`.
-- أو اربط المستودع من **Settings → GitHub** في v0؛ تحفظ التغييرات على الفرع المرتبط، ويمكن استنساخ هذا الفرع في بيئة Flutter/Android خارجية.
-- يضم `.gitignore` ملفات الإعداد المحلية ومخرجات Flutter/Gradle ومفاتيح Android. لا تُدرج `local.properties`, `config.php`, قواعد بيانات أو dumps، ملفات `.env`, مفاتيح توقيع، `google-services.json` أو بيانات مستخدمين في ZIP/Git. `pubspec.lock` غير مولّد بعد في هذه البيئة؛ شغّل `flutter pub get` خارجيًا، وضمّن الملف الناتج في Git لضمان ثبات الاعتماديات.
+أُضيف سير عمل GitHub Actions في `.github/workflows/android-apk.yml`. يجهز Ubuntu وJDK 17 وFlutter Stable وAndroid SDK، ثم يشغّل `flutter pub get`, `flutter analyze`, `flutter test`, ويبني APK، ويثبته ويشغله على محاكي Android آليًا. لا يحتاج جهازك إلى Android Studio أو SDK.
+
+1. اربط المشروع بمستودع GitHub من **Settings → GitHub** في v0، وادفع هذا الفرع إلى المستودع. صلاحية الوصول إلى مستودع GitHub غير متاحة من بيئة البناء هذه؛ لذلك لم أستطع تشغيل workflow عنك.
+2. عند وصول التغييرات إلى GitHub يبدأ البناء آليًا؛ أو افتح **Actions → Build Android APK → Run workflow** لإدخال عنوان API تجريبي. الافتراضي `https://test.example.invalid/api/v1/` عنوان وهمي يمنع الاتصال بموقع صراحة ولا يمثل Backend عامل. يقبل الـworkflow خادم HTTPS تجريبي خارجي فقط، ويرفض نطاق `sarehny.com` والعناوين المحلية.
+3. بعد نجاح الفحوصات والبناء واختبار التشغيل على المحاكي، نزّل ملف `sarehny-android-debug-<رقم التشغيل>` من قسم **Artifacts** في صفحة تشغيل Workflow. الـArtifact متاح 14 يومًا. هذا APK debug قابل للتثبيت، وليس نسخة إنتاج موقعة.
+
+**حدود ما يثبته الـworkflow:** نجاح البناء واختبار ظهور عملية التطبيق على محاكي نظيف لا يثبت اتصال API أو قاعدة بيانات. عنوان `.invalid` الافتراضي لا يتصل بخادم؛ استخدم عنوانًا منفصلًا لبيئة اختبار تملكها. لم يُنشر API إلى Hostinger ولم تُختبر قاعدة بيانات الموقع. قبل ربط Backend الحقيقي، يلزم نشر نسخة API معزولة وربطها بقاعدة تجريبية ومراجعة مصادقة الجلسات وCSRF والتوافق معها. لا تدخل أسرارًا أو مفاتيح داخل عنوان URL.
+
+## 8) تنزيل المشروع كاملًا أو ZIP
+
+- لتنزيل المصدر مع المجلدات والمسارات من v0، استخدم قائمة النقاط الثلاث أعلى المشروع واختر **Download ZIP**. يشمل المشروع ملف CI. لفتح Flutter، فك الضغط وافتح مجلد `mobile/` في الطرفية أو Android Studio.
+- أو استخدم GitHub المتصل مع المشروع، واستنسخ الفرع الذي يحتوي التغييرات.
+- يحجب `.gitignore` ملفات الإعداد ومخرجات Flutter/Gradle ومفاتيح Android وقواعد البيانات المحلية. لا تُدرج `local.properties`, `config.php`, قواعد بيانات أو dumps، ملفات `.env`, مفاتيح توقيع، `google-services.json` أو بيانات مستخدمين في ZIP/Git. `pubspec.lock` غير مولّد هنا؛ يولّده `flutter pub get` في CI قبل التحليل والبناء.
 
 ## حالة التحقق في بيئة الإنشاء
 
-تمت مراجعة ملفات Flutter وPHP المتاحة ومقارنة أسماء حقول/مسارات API مع سكربت PHP المرفق. أُصلح عنوان الاختبار الافتراضي، تحقق CSRF لطلبات POST، حقول الملف العام الناقصة، وإنشاء Android Gradle scaffold وWrapper. **لم يُشغّل** `php -l`, `flutter analyze`, `flutter test`, Gradle أو محاكي Android هنا لعدم توفر PHP وFlutter/Dart وJava/Android SDK في البيئة. لا توجد نتيجة اتصال مؤكدة بقاعدة أو خادم، ولم يحدث أي نشر أو تعديل على Hostinger أو قاعدة بيانات حقيقية.
+تمت مراجعة ملفات Flutter وPHP المتاحة ومقارنة أسماء حقول/مسارات API مع سكربت PHP المرفق. أُصلح عنوان الاختبار الافتراضي، تحقق CSRF لطلبات POST، حقول الملف العام الناقصة، وإنشاء Android Gradle scaffold وWrapper. أُضيف workflow خارجي يشغّل التحليل والاختبارات والبناء واختبار تثبيت/بدء التطبيق على محاكي GitHub Actions. **لم يُشغّل** `php -l`, `flutter analyze`, `flutter test`, Gradle أو محاكي Android في بيئة v0 لعدم توفر PHP وFlutter/Dart وJava/Android SDK. لم أشغّل workflow على GitHub لأن هذا المشروع غير موصول بمستودع GitHub في السياق الحالي ولا تتوفر صلاحيات GitHub هنا. لا توجد نتيجة اتصال مؤكدة بقاعدة أو خادم، ولم يحدث أي نشر أو تعديل على Hostinger أو قاعدة بيانات حقيقية.
