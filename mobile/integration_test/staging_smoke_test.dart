@@ -85,6 +85,8 @@ void main() {
 
     await tester.tap(find.text('الرسائل').last);
     await _settle(tester);
+    await tester.tap(find.byTooltip('تحديث الرسائل'));
+    await _settle(tester);
     expect(find.text(marker), findsOneWidget);
 
     final messageCard = find.ancestor(of: find.text(marker), matching: find.byType(Card)).first;
