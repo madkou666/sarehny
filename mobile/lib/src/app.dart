@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api_client.dart';
@@ -14,17 +16,35 @@ class SarehnyApp extends StatefulWidget {
   State<SarehnyApp> createState() => _SarehnyAppState();
 }
 
-class _SarehnyAppState extends State<SarehnyApp> {
+class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
   final ApiClient _api = ApiClient();
   late Future<Map<String, dynamic>> _bootstrap;
+  Timer? _themeRefreshTimer;
   AppUser? _user;
   SarehnyPalette _palette = SarehnyPalette.defaults;
+  int _themeRequestId = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _themeRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      unawaited(_refreshTheme());
+    });
     _bootstrap = _api.session();
     _initializeTheme();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refreshTheme());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _themeRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeTheme() async {
@@ -35,10 +55,11 @@ class _SarehnyAppState extends State<SarehnyApp> {
   }
 
   Future<void> _refreshTheme() async {
+    final requestId = ++_themeRequestId;
     try {
       final data = await _api.appTheme();
       final value = data['theme'];
-      if (!mounted || value is! Map<String, dynamic>) return;
+      if (!mounted || requestId != _themeRequestId || value is! Map<String, dynamic>) return;
       setState(() => _palette = SarehnyPalette.fromServer(value));
     } catch (_) {}
   }
