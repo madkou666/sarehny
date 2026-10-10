@@ -26,15 +26,21 @@ export default function Home() {
         <span className="hidden items-center gap-2 rounded-full border border-[#eae8f0] bg-white px-4 py-2 text-xs font-semibold text-[#596074] sm:flex"><ShieldCheck size={15} className="text-[#2f8f76]" /> معاينة تصميم Flutter</span>
         <a className="flex items-center gap-2 rounded-xl bg-[#7357c8] px-4 py-2.5 text-sm font-bold text-white" href="#inbox">المعاينة <ArrowUpLeft size={16} /></a>
       </header>
-      <section aria-labelledby="download-title" className="mx-auto mb-2 flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-5 sm:flex-row sm:px-8">
+      <section aria-labelledby="download-title" className="mx-auto mb-2 flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-5 sm:flex-row sm:px-8">
         <div className="text-center sm:text-right">
-          <h2 id="download-title" className="text-sm font-extrabold">حمّل مشروع Sarehny لـ Android</h2>
-          <p className="mt-1 text-xs text-[#73788a]">ملفات Flutter وPHP API وAndroid كاملة بصيغة ZIP</p>
+          <h2 id="download-title" className="text-sm font-extrabold">ملفات Sarehny للتنزيل</h2>
+          <p className="mt-1 text-xs text-[#73788a]">حمّل حزمة API وحدها أو نسخة المشروع الكاملة.</p>
         </div>
-        <a href="/downloads/saraha-android-project.zip" download className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
-          <Download size={17} aria-hidden="true" />
-          تنزيل المشروع ZIP
-        </a>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <a href="/downloads/hostinger-api-v1.zip" download className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
+            <Download size={17} aria-hidden="true" />
+            تنزيل ملفات API فقط
+          </a>
+          <a href="/downloads/saraha-android-project.zip" download className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-[#eae8f0] bg-white px-5 py-2.5 text-sm font-bold text-[#514b64] transition hover:bg-[#faf9fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
+            <Download size={17} aria-hidden="true" />
+            تنزيل المشروع الكامل
+          </a>
+        </div>
       </section>
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-10 pt-8 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:gap-16 lg:pb-16 lg:pt-14">
         <div className="max-w-xl">
