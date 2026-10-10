@@ -9,7 +9,7 @@ void main() {
         'username': 'sara_99',
         'display_name': 'سارة',
         'email': 'sara@test.invalid',
-        'public_url': 'http://localhost:8080/sara_99',
+        'public_url': '/sara_99',
         'avatar_url': null,
         'is_verified': true,
         'insights_enabled': false,
@@ -17,7 +17,7 @@ void main() {
 
       expect(user.id, 42);
       expect(user.username, 'sara_99');
-      expect(user.publicUrl, 'https://sarehny.com/sara_99');
+      expect(user.publicUrl, '/sara_99');
       expect(user.isVerified, isTrue);
     });
   });
