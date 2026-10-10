@@ -13,7 +13,18 @@
 
 تحقق من نسخ PHP وإضافاته بـ `php -v` و`php -m`، ومن بيئة Android بـ `flutter doctor -v`. لم تُشغّل هذه الأدوات داخل بيئة إنشاء المشروع.
 
-## 2) أنشئ نسخة PHP وقاعدة اختبار محليتين
+## 2) تجهيز بيئة البناء الخارجية (Flutter وJava وAndroid SDK)
+
+1. ثبّت Git من [git-scm.com](https://git-scm.com/downloads).
+2. ثبّت JDK 17. يمكن تنزيل Temurin 17 من [Adoptium](https://adoptium.net/temurin/releases/?version=17)، أو استخدام JDK 17 المرفق مع Android Studio إن كان مثبتًا. بعد التثبيت، تحقق بـ `java -version` وتأكد أن الإصدار 17. إذا اختار Flutter Java أخرى، حدّد مسار JDK 17 مرة واحدة عبر `flutter config --jdk-dir="/مسار/jdk-17"`، ثم افحص `flutter doctor -v`.
+3. ثبّت Flutter SDK Stable باتباع الدليل الرسمي لنظامك: [Install Flutter](https://docs.flutter.dev/get-started/install). فكّ SDK في مجلد تملكه، وأضف مجلد `flutter/bin` إلى PATH، ثم افتح طرفية جديدة وتحقق بـ `flutter --version` و`dart --version`.
+   - Windows: أضف المسار مثل `C:\src\flutter\bin` إلى متغير PATH من إعدادات النظام.
+   - macOS/Linux: أضف `export PATH="$HOME/develop/flutter/bin:$PATH"` إلى ملف إعداد الطرفية (عدّل المسار حسب موقع SDK)، ثم أعد فتح الطرفية أو حمّل إعدادها.
+4. نزّل Android Studio من [الموقع الرسمي](https://developer.android.com/studio/install) وشغّل Setup Wizard. من **SDK Manager** ثبّت Android SDK Platform التي يطلبها Flutter، و**Android SDK Platform-Tools**، و**Android SDK Command-line Tools (latest)**. ثبّت Android Emulator وصورة جهاز افتراضي إذا أردت الاختبار بالمحاكي. اترك إعداد SDK في المسار الافتراضي الذي يحدده Android Studio، أو استخدم المسار الذي يعرضه `flutter doctor -v`.
+5. من الطرفية نفّذ `flutter doctor --android-licenses` واقبل التراخيص بعد مراجعتها، ثم نفّذ `flutter doctor -v`. عالج كل بند Android أحمر قبل متابعة البناء.
+6. شغّل Android Studio/المحاكي أو صِل جهازًا فعليًا مع تفعيل USB debugging. عند بناء التطبيق على محاكي Android، عنوان الحاسوب المضيف هو `10.0.2.2`؛ أما الجهاز الفعلي فيستخدم IP الحاسوب على شبكة الاختبار.
+
+## 3) أنشئ نسخة PHP وقاعدة اختبار محليتين
 
 1. أنشئ مجلدًا جديدًا خارج المشروع مثل `/tmp/sarehny-test-site`، وانسخ إليه **ملفات سكربت PHP الأصلية** من أرشيف محلي تملكه. لا تنسخ `config.php` أو مجلدات الرفع/النسخ الاحتياطية من الموقع الحي، ولا تستخدم اتصال Hostinger. احتفظ بملفات PHP والمخطط `schema.sql` المتطابقة مع إصدار السكربت.
 2. أنشئ قاعدة فارغة ومستخدمًا مخصصًا لها على MySQL المحلي. مثال SQL (استبدل كلمة المرور بقيمة محلية عشوائية، ولا تحفظها في Git):
@@ -50,7 +61,7 @@
 
 لا تستورد نسخة بيانات من المستخدمين أو الرسائل. أنشئ حسابًا تجريبيًا ورسائل اصطناعية من التطبيق. لا تستخدم تحليل الشخصية أثناء هذا الاختبار؛ النقطة الأصلية قد تتصل بمزوّد AI وتستهلك حصة أو تكلفة أُعدّت في سكربت الموقع.
 
-## 3) عنوان API واحد وآمن افتراضيًا
+## 4) عنوان API واحد وآمن افتراضيًا
 
 الإعداد الوحيد للعميل موجود في `mobile/lib/src/api_config.dart` باسم `API_BASE_URL`. الافتراضي هو خادم الاختبار المحلي `http://10.0.2.2:8080/api/v1/`، وليس عنوان الموقع الحي. تُرسل الطلبات إلى `index.php?r=...`؛ لذلك لا يحتاج عميل Android إلى `mod_rewrite`.
 
@@ -64,7 +75,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1/
 
 إذا كان اختبارك على جهاز حقيقي، استبدل العنوان بعنوان IP للحاسوب على شبكة الاختبار. ولخادم اختبار منفصل استخدم عنوان HTTPS الخاص به في `--dart-define`. لا تضع عنوان الإنتاج أو أي سر في المصدر. السماح باتصالات HTTP موجود في Manifest نسخة **debug فقط**؛ Manifest إصدار release يرفض HTTP.
 
-## 4) فحوصات التطبيق وبناء Android
+## 5) فحوصات التطبيق وبناء Android
 
 افتح الطرفية في مجلد `mobile/`:
 
@@ -93,7 +104,7 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://test.exampl
 
 قبل توزيع إصدار فعلي، أعدّ توقيع Android بمفتاح تملكه في بيئتك الخارجية. لا تُضمّن keystore أو كلمات مروره في ZIP/Git؛ إعداد التوقيع غير مهيأ عمدًا هنا.
 
-## 5) الاختبار السلوكي المتوقع
+## 6) الاختبار السلوكي المتوقع
 
 على بيئة الاختبار وحدها:
 
@@ -105,9 +116,11 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://test.exampl
 
 يستخدم API جلسة PHP وCSRF، ويخزن معرّف الجلسة في `flutter_secure_storage`. الواجهة الحالية لا تسجل الصوت أو ترفع الصور أو تنفذ تسجيل الدخول الاجتماعي أو إشعارات FCM؛ لا تدّعي هذه الوظائف أنها تعمل.
 
-## 6) التصدير إلى GitHub أو ZIP
+## 7) تنزيل المشروع كاملًا أو ربطه بـ GitHub
 
-صدّر المشروع كما هو، ثم ابنِه من `mobile/` في بيئة Flutter/Android خارجية. احتفظ بملفات `mobile/android/gradlew*` و`gradle-wrapper.jar` في التصدير. لا تضف `local.properties`, `config.php`, قواعد بيانات أو dumps، ملفات `.env`, مفاتيح توقيع، `google-services.json` أو بيانات مستخدمين. `.gitignore` يستثني الملفات المحلية ومخرجات Flutter/Gradle ومفاتيح Android.
+- لتنزيل نسخة ZIP تشمل المشروع كاملًا مع المجلدات والمسارات كما هي: من قائمة المشروع أعلى اليمين (زر النقاط الثلاث) اختر **Download ZIP**. بعد فك الضغط، افتح المجلد `mobile/` في الطرفية الخارجية واتبع خطوات البناء أعلاه. تأكد أن الأرشيف يحتوي `deployment/api/v1/` و`mobile/android/gradlew*` و`mobile/android/gradle/wrapper/gradle-wrapper.jar`.
+- أو اربط المستودع من **Settings → GitHub** في v0؛ تحفظ التغييرات على الفرع المرتبط، ويمكن استنساخ هذا الفرع في بيئة Flutter/Android خارجية.
+- يضم `.gitignore` ملفات الإعداد المحلية ومخرجات Flutter/Gradle ومفاتيح Android. لا تُدرج `local.properties`, `config.php`, قواعد بيانات أو dumps، ملفات `.env`, مفاتيح توقيع، `google-services.json` أو بيانات مستخدمين في ZIP/Git. `pubspec.lock` غير مولّد بعد في هذه البيئة؛ شغّل `flutter pub get` خارجيًا، وضمّن الملف الناتج في Git لضمان ثبات الاعتماديات.
 
 ## حالة التحقق في بيئة الإنشاء
 
