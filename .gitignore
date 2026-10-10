@@ -14,3 +14,16 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+
+# Flutter and Android generated files / local signing credentials
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/google-services.json
+mobile/android/app/*.jks
+mobile/android/app/*.keystore
