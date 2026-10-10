@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api_client.dart';
+import 'api_config.dart';
 import 'app_theme.dart';
 import 'models.dart';
 import 'screens/account_screen.dart';
@@ -113,11 +114,19 @@ class _OfflineScreen extends StatelessWidget {
           body: Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.cloud_off_outlined, size: 48, color: SarehnyColors.primary),
             const SizedBox(height: 16),
-            Text('تعذّر الاتصال بصراحة', style: Theme.of(context).textTheme.titleLarge),
+            Text(ApiConfig.isConfigured ? 'تعذّر الاتصال بخادم الاختبار' : 'الخادم غير مهيأ للاختبار', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text('تحقق من الإنترنت أو من توفر واجهة الموقع، ثم حاول مرة أخرى.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted)),
-            const SizedBox(height: 18),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+            Text(
+              ApiConfig.isConfigured
+                  ? 'تحقق من اتصال خادم الاختبار وتوفّره، ثم حاول مرة أخرى.'
+                  : 'هذه نسخة آمنة بلا عنوان API افتراضي؛ لم يتم إرسال طلب إلى موقع الإنتاج أو إلى خادم وهمي. لاستخدام وظائف الحساب والرسائل، حدّد عنوان خادم اختبار حقيقي بعد تجهيزه.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted),
+            ),
+            if (ApiConfig.isConfigured) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+            ],
           ]))),
         ),
       );

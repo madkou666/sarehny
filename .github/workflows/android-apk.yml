@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (API disabled)
 
 on:
   push:
@@ -6,12 +6,6 @@ on:
       - 'mobile/**'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
-    inputs:
-      api_base_url:
-        description: 'HTTPS test API base URL (never use the production site)'
-        required: false
-        default: 'https://test.example.invalid/api/v1/'
-        type: string
 
 permissions:
   contents: read
@@ -22,11 +16,9 @@ concurrency:
 
 jobs:
   build:
-    name: Analyze, test, and build debug APK
+    name: Analyze, test, and build offline debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      API_BASE_URL: ${{ github.event.inputs.api_base_url || 'https://test.example.invalid/api/v1/' }}
+    timeout-minutes: 35
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -45,24 +37,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Validate test API URL
-        run: |
-          python3 - <<'PY'
-          import os
-          from urllib.parse import urlsplit
-
-          value = os.environ['API_BASE_URL'].strip()
-          parsed = urlsplit(value)
-          host = (parsed.hostname or '').lower().rstrip('.')
-          assert parsed.scheme == 'https', 'Test API URL must use HTTPS.'
-          assert host and host not in {'localhost', '127.0.0.1', '10.0.2.2'}, 'Use an externally reachable test server.'
-          assert host != 'sarehny.com' and not host.endswith('.sarehny.com'), 'Production Sarehny hosts are blocked.'
-          assert parsed.username is None and parsed.password is None, 'Do not put credentials in the URL.'
-          assert not parsed.query and not parsed.fragment, 'Do not put secrets or tokens in URL parameters.'
-          assert parsed.path.rstrip('/').endswith('/api/v1'), 'URL must point to the /api/v1/ API base.'
-          print(f'Building with API host: {host}')
-          PY
-
       - name: Resolve Flutter dependencies
         working-directory: mobile
         run: flutter pub get
@@ -75,9 +49,9 @@ jobs:
         working-directory: mobile
         run: flutter test
 
-      - name: Build installable debug APK
+      - name: Build offline installable debug APK
         working-directory: mobile
-        run: flutter build apk --debug --dart-define="API_BASE_URL=${API_BASE_URL}"
+        run: flutter build apk --debug
 
       - name: Install and launch APK in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -91,20 +65,21 @@ jobs:
             adb shell am start -W -n com.sarehny.sarehny_mobile/.MainActivity
             adb shell 'for attempt in $(seq 1 20); do if pidof com.sarehny.sarehny_mobile; then exit 0; fi; sleep 1; done; exit 1'
 
-      - name: Upload APK artifact
+      - name: Upload offline APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sarehny-android-debug-${{ github.run_number }}
+          name: sarehny-android-debug-offline-${{ github.run_number }}
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Summarize APK download
+      - name: Summarize safe build
         if: success()
         run: |
           {
-            echo '## Android APK is ready'
+            echo '## Offline Android APK is ready'
             echo ''
-            echo 'Download the `sarehny-android-debug-${{ github.run_number }}` artifact from this workflow run.'
-            echo 'The APK is a debug build. Its API URL is the test URL supplied to the workflow; the default is a non-production placeholder.'
+            echo 'Download the `sarehny-android-debug-offline-${{ github.run_number }}` artifact from this workflow run.'
+            echo 'No API_BASE_URL was supplied. API requests are disabled and the app does not contact production or a placeholder server.'
+            echo 'Emulator launch proves app startup only; it does not prove API or database functionality.'
           } >> "$GITHUB_STEP_SUMMARY"

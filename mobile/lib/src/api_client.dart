@@ -40,7 +40,11 @@ class ApiClient {
     ));
   }
 
-  static String _normalizeBaseUrl(String value) => value.endsWith('/') ? value : '$value/';
+  static String _normalizeBaseUrl(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return '';
+    return normalized.endsWith('/') ? normalized : '$normalized/';
+  }
 
   final String baseUrl;
   final FlutterSecureStorage _storage;
@@ -119,6 +123,9 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> _request(String method, String path, {Map<String, dynamic>? query, Map<String, String>? fields}) async {
+    if (baseUrl.isEmpty) {
+      throw const ApiException('الاتصال بالخادم غير مهيأ. لم يتم إرسال أي طلب API.');
+    }
     try {
       final response = await _dio.request<Map<String, dynamic>>(
         'index.php',
