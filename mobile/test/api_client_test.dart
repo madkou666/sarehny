@@ -19,9 +19,9 @@ void main() {
     expect(() => api.sitePage('https://other.example/admin.php'), throwsA(isA<ApiException>()));
   });
 
-  test('site page resolver remains disabled without an explicit API URL', () {
+  test('default site pages resolve to the original Sarehny production site', () {
     final api = ApiClient();
 
-    expect(() => api.sitePage('index.php'), throwsA(isA<ApiException>()));
+    expect(api.sitePage('index.php').toString(), 'https://sarehny.com/index.php');
   });
 }
