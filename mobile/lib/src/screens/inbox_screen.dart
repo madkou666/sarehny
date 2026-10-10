@@ -20,6 +20,9 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = false;
+  int _requestVersion = 0;
+  String? _cursorCreatedAt;
+  int? _cursorId;
   String? _error;
   static const _filters = <(String, String)>[( 'all', 'الكل'), ('questions', 'الأسئلة'), ('pending', 'بانتظار الإجابة'), ('published', 'منشورة'), ('favorites', 'المفضلة')];
 
@@ -35,33 +38,69 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   }
 
   Future<void> _load({bool refresh = false}) async {
-    if (refresh) { _messages.clear(); _page = 1; }
-    setState(() { _loading = _messages.isEmpty; _error = null; });
+    final requestVersion = ++_requestVersion;
+    final requestedFilter = _filter;
+    if (refresh) {
+      _messages.clear();
+      _page = 1;
+      _hasMore = false;
+      _cursorCreatedAt = null;
+      _cursorId = null;
+    }
+    setState(() { _loading = _messages.isEmpty; _loadingMore = false; _error = null; });
     try {
-      final result = await widget.api.inbox(filter: _filter, page: 1);
-      final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(value as Map<String, dynamic>)).toList();
-      if (!mounted) return;
+      final result = await widget.api.inbox(filter: requestedFilter, page: 1);
+      final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(Map<String, dynamic>.from(value as Map))).toList();
+      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter) return;
       setState(() {
         _messages..clear()..addAll(items);
         _stats = Map<String, dynamic>.from(result['stats'] as Map? ?? {});
-        _hasMore = (result['pagination'] as Map?)?['has_more'] == true;
+        final pagination = result['pagination'] as Map?;
+        _hasMore = pagination?['has_more'] == true;
+        final cursor = pagination?['next_cursor'] as Map?;
+        _cursorCreatedAt = cursor?['created_at'] as String?;
+        _cursorId = (cursor?['id'] as num?)?.toInt();
         _page = 1;
         _loading = false;
       });
-    } on ApiException catch (error) {
-      if (mounted) setState(() { _error = error.message; _loading = false; });
+    } on Object catch (error) {
+      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter) {
+        setState(() { _error = error is ApiException ? error.message : 'تعذّر قراءة الرسائل من الخادم.'; _loading = false; });
+      }
     }
   }
 
   Future<void> _loadMore() async {
+    final requestVersion = _requestVersion;
+    final requestedFilter = _filter;
+    final requestedPage = _page + 1;
     setState(() => _loadingMore = true);
     try {
-      final result = await widget.api.inbox(filter: _filter, page: _page + 1);
-      final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(value as Map<String, dynamic>)).toList();
-      if (mounted) setState(() { _messages.addAll(items); _page++; _hasMore = (result['pagination'] as Map?)?['has_more'] == true; });
-    } on ApiException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
-    } finally { if (mounted) setState(() => _loadingMore = false); }
+      final result = await widget.api.inbox(
+        filter: requestedFilter,
+        page: requestedPage,
+        beforeCreatedAt: _cursorCreatedAt,
+        beforeId: _cursorId,
+      );
+      final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(Map<String, dynamic>.from(value as Map))).toList();
+      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter) return;
+      setState(() {
+        final existingIds = _messages.map((message) => message.id).toSet();
+        _messages.addAll(items.where((message) => existingIds.add(message.id)));
+        final pagination = result['pagination'] as Map?;
+        _page = (pagination?['page'] as num?)?.toInt() ?? requestedPage;
+        _hasMore = pagination?['has_more'] == true;
+        final cursor = pagination?['next_cursor'] as Map?;
+        _cursorCreatedAt = cursor?['created_at'] as String?;
+        _cursorId = (cursor?['id'] as num?)?.toInt();
+      });
+    } on Object catch (error) {
+      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error is ApiException ? error.message : 'تعذّر تحميل الرسائل الأقدم.')));
+      }
+    } finally {
+      if (mounted && requestVersion == _requestVersion) setState(() => _loadingMore = false);
+    }
   }
 
   Future<void> _action(InboxMessage message, String action, Map<String, String> fields) async {

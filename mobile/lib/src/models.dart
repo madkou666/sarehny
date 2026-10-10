@@ -7,6 +7,7 @@ class AppUser {
     required this.publicUrl,
     this.avatarUrl,
     this.isVerified = false,
+    this.isAdmin = false,
     this.insightsEnabled = false,
   });
 
@@ -17,6 +18,7 @@ class AppUser {
   final String publicUrl;
   final String? avatarUrl;
   final bool isVerified;
+  final bool isAdmin;
   final bool insightsEnabled;
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
@@ -27,6 +29,7 @@ class AppUser {
         publicUrl: json['public_url'] as String? ?? '',
         avatarUrl: json['avatar_url'] as String?,
         isVerified: json['is_verified'] as bool? ?? false,
+        isAdmin: json['is_admin'] as bool? ?? false,
         insightsEnabled: json['insights_enabled'] as bool? ?? false,
       );
 }

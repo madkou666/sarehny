@@ -12,6 +12,7 @@ void main() {
         'public_url': '/sara_99',
         'avatar_url': null,
         'is_verified': true,
+        'is_admin': true,
         'insights_enabled': false,
       });
 
@@ -19,6 +20,13 @@ void main() {
       expect(user.username, 'sara_99');
       expect(user.publicUrl, '/sara_99');
       expect(user.isVerified, isTrue);
+      expect(user.isAdmin, isTrue);
+    });
+
+    test('does not grant admin access when the server omits the role', () {
+      final user = AppUser.fromJson({'id': 7, 'username': 'member'});
+
+      expect(user.isAdmin, isFalse);
     });
   });
 

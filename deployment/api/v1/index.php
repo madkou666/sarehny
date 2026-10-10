@@ -39,6 +39,7 @@ function api_safe_user($user) {
     'email' => (string)($user['email'] ?? ''),
     'avatar_url' => !empty($user['avatar']) && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', (string)$user['avatar']) ? api_origin() . '/uploads/avatars/' . rawurlencode($user['avatar']) : null,
     'is_verified' => !empty($user['is_verified']),
+    'is_admin' => !empty($user['is_admin']),
     'insights_enabled' => function_exists('insights_active') ? insights_active($user) : false,
     'created_at' => $user['created_at'] ?? null,
     'public_url' => api_origin() . '/' . rawurlencode((string)$user['username']),
@@ -220,14 +221,33 @@ try {
     $count = $pdo->prepare('SELECT COUNT(*) FROM messages WHERE ' . $where);
     $count->execute([(int)$user['id']]);
     $total = (int)$count->fetchColumn();
-    $offset = ($page - 1) * $limit;
-    $stmt = $pdo->prepare('SELECT id,body,is_favorite,is_question,answer,answered_at,created_at,audio_path,audio_secs FROM messages WHERE ' . $where . ' ORDER BY created_at DESC,id DESC LIMIT ' . $limit . ' OFFSET ' . $offset);
-    $stmt->execute([(int)$user['id']]);
+    $beforeCreatedAt = trim((string)($_GET['before_created_at'] ?? ''));
+    $beforeId = (int)($_GET['before_id'] ?? 0);
+    $hasCursor = $beforeCreatedAt !== '' || $beforeId > 0;
+    if ($hasCursor && ($beforeId < 1 || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/D', $beforeCreatedAt))) {
+      api_error(422, 'مؤشر ترقيم الرسائل غير صالح.');
+    }
+    $fetchWhere = $where;
+    $params = [(int)$user['id']];
+    if ($hasCursor) {
+      $fetchWhere .= ' AND (created_at < ? OR (created_at = ? AND id < ?))';
+      $params[] = $beforeCreatedAt;
+      $params[] = $beforeCreatedAt;
+      $params[] = $beforeId;
+    }
+    $offset = $hasCursor ? 0 : ($page - 1) * $limit;
+    $stmt = $pdo->prepare('SELECT id,body,is_favorite,is_question,answer,answered_at,created_at,audio_path,audio_secs FROM messages WHERE ' . $fetchWhere . ' ORDER BY created_at DESC,id DESC LIMIT ' . ($limit + 1) . ' OFFSET ' . $offset);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+    $hasMore = count($rows) > $limit;
+    if ($hasMore) array_pop($rows);
     $messages = [];
-    foreach ($stmt->fetchAll() as $row) {
+    foreach ($rows as $row) {
       $messages[] = ['id' => (int)$row['id'], 'body' => (string)$row['body'], 'is_favorite' => !empty($row['is_favorite']), 'is_question' => !empty($row['is_question']), 'answer' => $row['answer'], 'answered_at' => $row['answered_at'], 'created_at' => $row['created_at'], 'is_voice' => !empty($row['audio_path']), 'audio_seconds' => $row['audio_secs'] === null ? null : (int)$row['audio_secs']];
     }
-    api_ok(['messages' => $messages, 'stats' => api_message_stats((int)$user['id']), 'pagination' => ['page' => $page, 'limit' => $limit, 'total' => $total, 'has_more' => $offset + count($messages) < $total], 'filter' => $filter]);
+    $last = $rows ? $rows[count($rows) - 1] : null;
+    $nextCursor = $last ? ['created_at' => (string)$last['created_at'], 'id' => (int)$last['id']] : null;
+    api_ok(['messages' => $messages, 'stats' => api_message_stats((int)$user['id']), 'pagination' => ['page' => $page, 'limit' => $limit, 'total' => $total, 'has_more' => $hasMore, 'next_cursor' => $nextCursor], 'filter' => $filter]);
   }
 
   if ($method === 'POST' && preg_match('#^/messages/(\d+)/(favorite|delete|answer|unpublish|report)$#D', $route, $match)) {
@@ -338,6 +358,24 @@ try {
     $pdo->prepare('UPDATE users SET password_hash=? WHERE id=?')->execute([password_hash($password, PASSWORD_DEFAULT), (int)$user['id']]);
     session_regenerate_id(true);
     api_ok(['csrf' => csrf()]);
+  }
+
+  if ($method === 'POST' && $route === '/account/delete') {
+    $user = api_require_user();
+    $current = (string)($_POST['current_password'] ?? '');
+    $confirmation = (string)($_POST['confirm_username'] ?? '');
+    if (!password_verify($current, (string)$user['password_hash'])) api_error(403, 'كلمة المرور الحالية غير صحيحة.');
+    if (!hash_equals((string)$user['username'], $confirmation)) api_error(422, 'اكتب اسم المستخدم الحالي تمامًا لتأكيد الحذف.');
+    $avatar = (string)($user['avatar'] ?? '');
+    $pdo->prepare('DELETE FROM users WHERE id=?')->execute([(int)$user['id']]);
+    if ($avatar !== '' && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', $avatar)) {
+      $avatarPath = dirname(__DIR__, 2) . '/uploads/avatars/' . $avatar;
+      if (is_file($avatarPath)) @unlink($avatarPath);
+    }
+    $_SESSION = [];
+    remember_clear();
+    session_destroy();
+    api_ok(['deleted' => true]);
   }
 
   if ($method === 'POST' && $route === '/ai/analyze') {

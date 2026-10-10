@@ -49,6 +49,7 @@ class ApiClient {
   }
 
   final String baseUrl;
+  Uri get adminUrl => Uri.parse(baseUrl).resolve('../../admin.php');
   final FlutterSecureStorage _storage;
   late final Dio _dio;
   String? _csrf;
@@ -106,13 +107,37 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> inbox({String filter = 'all', int page = 1, int limit = 20}) =>
-      _request('GET', 'inbox', query: {'filter': filter, 'page': page, 'limit': limit});
+  Future<Map<String, dynamic>> inbox({
+    String filter = 'all',
+    int page = 1,
+    int limit = 20,
+    String? beforeCreatedAt,
+    int? beforeId,
+  }) => _request('GET', 'inbox', query: {
+        'filter': filter,
+        'page': page,
+        'limit': limit,
+        if (beforeCreatedAt != null && beforeId != null) 'before_created_at': beforeCreatedAt,
+        if (beforeCreatedAt != null && beforeId != null) 'before_id': beforeId,
+      });
 
   Future<void> messageAction(int id, String action, {Map<String, String> fields = const {}}) async =>
       _post('messages/$id/$action', fields);
 
   Future<void> updateProfile(String name) async => _post('account/profile', {'name': name});
+  Future<AppUser> updateUsername(String username) async {
+    final data = await _post('account/username', {'username': username});
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+  }
+  Future<void> updateEmail(String email, String currentPassword) async =>
+      _post('account/email', {'email': email, 'current_password': currentPassword});
+  Future<void> updatePassword(String currentPassword, String newPassword) async =>
+      _post('account/password', {'current_password': currentPassword, 'new_password': newPassword});
+  Future<void> deleteAccount(String currentPassword, String username) async {
+    await _post('account/delete', {'current_password': currentPassword, 'confirm_username': username});
+    await _storage.delete(key: 'sarehny_php_session');
+    _csrf = null;
+  }
   Future<void> sendPublicMessage(String username, String body, {bool question = false}) async =>
       _post('public-messages', {'username': username, 'body': body, 'kind': question ? 'question' : 'message'});
 

@@ -32,12 +32,14 @@ void main() {
       expect(theme.scaffoldBackgroundColor, palette.canvas);
     });
 
-    test('uses safe defaults for malformed colors and clamps radius', () {
+    test('uses the original dark site palette for malformed server colors and clamps radius', () {
       final palette = SarehnyPalette.fromServer({
         'colors': {'bg': 'url(unsafe)', 'primary': '#123'},
         'radius': 100,
       });
 
+      expect(SarehnyPalette.defaults.canvas, const Color(0xFF0A0E1A));
+      expect(SarehnyPalette.defaults.primary, const Color(0xFF60A5FA));
       expect(palette.canvas, SarehnyPalette.defaults.canvas);
       expect(palette.primary, SarehnyPalette.defaults.primary);
       expect(palette.radius, 24);

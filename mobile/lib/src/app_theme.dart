@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 
 class SarehnyColors {
-  static const ink = Color(0xFF242A3A);
-  static const muted = Color(0xFF7D8292);
-  static const canvas = Color(0xFFF7F6FA);
-  static const surface = Color(0xFFFFFFFF);
-  static const raised = Color(0xFFF0ECFB);
-  static const primary = Color(0xFF7357C8);
-  static const secondary = Color(0xFF947AE0);
-  static const mint = Color(0xFF2F8F76);
-  static const line = Color(0xFFEAE8F0);
-  static const warning = Color(0xFFCC9B38);
-  static const danger = Color(0xFFB64D62);
-  static const info = Color(0xFF426FC5);
+  static const ink = Color(0xFFF3F4F6);
+  static const ink2 = Color(0xFFD1D5DB);
+  static const muted = Color(0xFF9CA3AF);
+  static const canvas = Color(0xFF0A0E1A);
+  static const surface = Color(0xFF111827);
+  static const raised = Color(0xFF1F2937);
+  static const primary = Color(0xFF60A5FA);
+  static const secondary = Color(0xFFF472B6);
+  static const mint = Color(0xFF34D399);
+  static const line = Color(0xFF283247);
+  static const warning = Color(0xFFFBBF24);
+  static const danger = Color(0xFFF87171);
+  static const info = Color(0xFF93C5FD);
 }
 
 @immutable
@@ -54,7 +55,7 @@ class SarehnyPalette extends ThemeExtension<SarehnyPalette> {
     surface: SarehnyColors.surface,
     raised: SarehnyColors.raised,
     ink: SarehnyColors.ink,
-    ink2: SarehnyColors.ink,
+    ink2: SarehnyColors.ink2,
     muted: SarehnyColors.muted,
     line: SarehnyColors.line,
     primary: SarehnyColors.primary,
@@ -173,6 +174,7 @@ ThemeData buildSarehnyTheme([SarehnyPalette palette = SarehnyPalette.defaults]) 
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'NotoKufiArabic',
     brightness: brightness,
     extensions: [palette],
     colorScheme: scheme.copyWith(
