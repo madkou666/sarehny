@@ -9,7 +9,7 @@ if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (string)($_SER
 
 function api_reply($status, array $payload) {
   http_response_code($status);
-  echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
   exit;
 }
 
@@ -25,8 +25,8 @@ function api_error($status, $message, $code = null) {
 
 function api_origin() {
   $https = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-  $host = (string)($_SERVER['HTTP_HOST'] ?? 'sarehny.com');
-  if (!preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/D', $host)) $host = 'sarehny.com';
+  $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+  if (!preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/D', $host)) $host = 'localhost';
   return ($https ? 'https://' : 'http://') . $host;
 }
 
@@ -60,6 +60,14 @@ function api_rate_login() {
   return $key;
 }
 
+function api_require_csrf() {
+  $provided = (string)($_POST['csrf'] ?? ($_SERVER['HTTP_X_CSRF'] ?? ''));
+  $expected = (string)csrf();
+  if ($provided === '' || !hash_equals($expected, $provided)) {
+    api_reply(419, ['ok' => false, 'code' => 'csrf', 'csrf' => $expected, 'message' => 'تم تحديث رمز الحماية. حاول مجددًا.']);
+  }
+}
+
 function api_message_stats($userId) {
   global $pdo;
   $stmt = $pdo->prepare('SELECT COUNT(*) total, COALESCE(SUM(is_favorite),0) favorites, COALESCE(SUM(is_question=1),0) questions, COALESCE(SUM(is_question=1 AND answer IS NULL),0) pending, COALESCE(SUM(is_question=1 AND answer IS NOT NULL),0) published, COALESCE(SUM(created_at > NOW() - INTERVAL 1 DAY),0) today FROM messages WHERE recipient_id=? AND is_removed=0');
@@ -77,6 +85,8 @@ $route = '/' . trim($route, '/');
 if ($route === '/') $route = '/session';
 
 try {
+  if ($method === 'POST') api_require_csrf();
+
   if ($method === 'GET' && $route === '/session') {
     $user = me();
     api_ok(['csrf' => csrf(), 'user' => api_safe_user($user)]);
@@ -143,7 +153,7 @@ try {
     $stmt->execute([$username]);
     $profile = $stmt->fetch();
     if (!$profile || !empty($profile['is_disabled'])) api_error(404, 'لم نعثر على هذا الحساب.');
-    api_ok(['profile' => ['username' => $profile['username'], 'display_name' => $profile['display_name'], 'avatar_url' => !empty($profile['avatar']) && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', (string)$profile['avatar']) ? api_origin() . '/uploads/avatars/' . rawurlencode($profile['avatar']) : null, 'is_verified' => !empty($profile['is_verified'])]]);
+    api_ok(['profile' => ['username' => (string)$profile['username'], 'display_name' => (string)$profile['display_name'], 'avatar_url' => !empty($profile['avatar']) && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', (string)$profile['avatar']) ? api_origin() . '/uploads/avatars/' . rawurlencode($profile['avatar']) : null, 'is_verified' => !empty($profile['is_verified'])]]);
   }
 
   if ($method === 'POST' && $route === '/public-messages') {

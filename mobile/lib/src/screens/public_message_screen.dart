@@ -23,13 +23,19 @@ class _PublicMessageScreenState extends State<PublicMessageScreen> {
 
   Future<void> _lookup() async {
     final name = _username.text.trim().replaceFirst(RegExp(r'^@'), '');
-    if (name.length < 3) { setState(() => _error = 'اكتب اسم المستخدم أولًا.'); return; }
+    if (!RegExp(r'^[a-zA-Z0-9_]{3,30}$').hasMatch(name)) { setState(() => _error = 'اكتب اسم مستخدم صالحًا من ٣ إلى ٣٠ حرفًا.'); return; }
     setState(() { _busy = true; _error = null; _profile = null; });
     try {
       final data = await widget.api.publicProfile(name);
-      if (mounted) setState(() => _profile = Map<String, dynamic>.from(data['profile'] as Map));
+      final currentName = _username.text.trim().replaceFirst(RegExp(r'^@'), '');
+      if (mounted && currentName.toLowerCase() == name.toLowerCase()) {
+        setState(() => _profile = Map<String, dynamic>.from(data['profile'] as Map));
+      }
     } on ApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      final currentName = _username.text.trim().replaceFirst(RegExp(r'^@'), '');
+      if (mounted && currentName.toLowerCase() == name.toLowerCase()) {
+        setState(() => _error = error.message);
+      }
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
@@ -53,7 +59,7 @@ class _PublicMessageScreenState extends State<PublicMessageScreen> {
       Text('اكتب اسم حساب صراحة لإرسال رسالة خاصة أو سؤال مجهول.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted)),
       const SizedBox(height: 22),
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: TextField(controller: _username, textDirection: TextDirection.ltr, textAlign: TextAlign.left, onSubmitted: (_) => _lookup(), decoration: const InputDecoration(prefixText: '@', hintText: 'username', labelText: 'حساب المستلم'))),
+        Expanded(child: TextField(controller: _username, textDirection: TextDirection.ltr, textAlign: TextAlign.left, onSubmitted: (_) => _lookup(), onChanged: (_) => setState(() { _profile = null; _sent = false; _error = null; }), enabled: !_busy, decoration: const InputDecoration(prefixText: '@', hintText: 'username', labelText: 'حساب المستلم'))),
         const SizedBox(width: 9),
         SizedBox(height: 56, child: FilledButton.tonal(onPressed: _busy ? null : _lookup, child: const Icon(Icons.arrow_forward_rounded))),
       ]),
@@ -64,7 +70,8 @@ class _PublicMessageScreenState extends State<PublicMessageScreen> {
           CircleAvatar(backgroundColor: SarehnyColors.primarySoft, foregroundImage: _profile!['avatar_url'] == null ? null : NetworkImage(_profile!['avatar_url'] as String), child: _profile!['avatar_url'] == null ? const Icon(Icons.person_outline_rounded, color: SarehnyColors.primary) : null),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_profile!['display_name'] as String? ?? '', style: Theme.of(context).textTheme.titleMedium), Text('@${_profile!['username']}', textDirection: TextDirection.ltr, style: Theme.of(context).textTheme.bodySmall)])),
-          const Icon(Icons.verified_user_outlined, color: SarehnyColors.mint, size: 19),
+          if (_profile!['is_verified'] == true)
+            const Icon(Icons.verified_user_outlined, color: SarehnyColors.mint, size: 19),
         ])),
         const SizedBox(height: 14),
         SegmentedButton<bool>(segments: const [ButtonSegment(value: false, label: Text('رسالة خاصة'), icon: Icon(Icons.lock_outline_rounded)), ButtonSegment(value: true, label: Text('سؤال'), icon: Icon(Icons.help_outline_rounded))], selected: {_question}, onSelectionChanged: (selection) => setState(() => _question = selection.first)),

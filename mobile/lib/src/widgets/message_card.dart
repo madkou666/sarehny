@@ -23,13 +23,73 @@ class MessageCard extends StatelessWidget {
     if (answer != null && answer.length >= 2) await onAction('answer', {'answer': answer});
   }
 
+  Future<void> _report(BuildContext context) async {
+    final controller = TextEditingController();
+    var reason = 'other';
+    final report = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('الإبلاغ عن الرسالة'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: reason,
+                  decoration: const InputDecoration(labelText: 'سبب البلاغ'),
+                  items: const [
+                    DropdownMenuItem(value: 'harassment', child: Text('مضايقة')),
+                    DropdownMenuItem(value: 'threat', child: Text('تهديد')),
+                    DropdownMenuItem(value: 'spam', child: Text('رسالة مزعجة')),
+                    DropdownMenuItem(value: 'other', child: Text('سبب آخر')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => reason = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  maxLength: 500,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'تفاصيل إضافية (اختياري)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, {
+                  'reason': reason,
+                  'details': controller.text.trim(),
+                }),
+                child: const Text('إرسال البلاغ'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+    if (report != null) await onAction('report', report);
+  }
+
   Future<void> _select(BuildContext context, String action) async {
     if (action == 'answer') return _answer(context);
+    if (action == 'report') return _report(context);
     if (action == 'delete') {
       final confirm = await showDialog<bool>(context: context, builder: (context) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(title: const Text('حذف الرسالة؟'), content: const Text('سيتم حذفها من صندوقك نهائيًا.'), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف'))])));
       if (confirm != true) return;
     }
-    if (action == 'report') return onAction('report', {'reason': 'other', 'details': ''});
     await onAction(action, const {});
   }
 
@@ -52,7 +112,12 @@ class MessageCard extends StatelessWidget {
         IconButton(tooltip: message.isFavorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة', onPressed: () => _select(context, 'favorite'), icon: Icon(message.isFavorite ? Icons.star_rounded : Icons.star_outline_rounded, color: message.isFavorite ? const Color(0xFFCC9B38) : SarehnyColors.muted)),
         if (message.isQuestion) TextButton.icon(onPressed: () => _select(context, 'answer'), icon: const Icon(Icons.reply_rounded, size: 18), label: Text(message.answer == null ? 'أجب' : 'تعديل الإجابة')),
         const Spacer(),
-        PopupMenuButton<String>(tooltip: 'إجراءات الرسالة', onSelected: (action) => _select(context, action), itemBuilder: (context) => [const PopupMenuItem(value: 'report', child: Text('إبلاغ')), const PopupMenuItem(value: 'delete', child: Text('حذف الرسالة'))], icon: const Icon(Icons.more_horiz_rounded, color: SarehnyColors.muted)),
+        PopupMenuButton<String>(tooltip: 'إجراءات الرسالة', onSelected: (action) => _select(context, action), itemBuilder: (context) => [
+          if (message.isQuestion && message.answer != null)
+            const PopupMenuItem(value: 'unpublish', child: Text('إخفاء الإجابة المنشورة')),
+          const PopupMenuItem(value: 'report', child: Text('إبلاغ')),
+          const PopupMenuItem(value: 'delete', child: Text('حذف الرسالة')),
+        ], icon: const Icon(Icons.more_horiz_rounded, color: SarehnyColors.muted)),
       ]),
     ])));
   }

@@ -68,7 +68,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
     try {
       await widget.api.messageAction(message.id, action, fields: fields);
       if (!mounted) return;
-      final label = switch (action) { 'delete' => 'حُذفت الرسالة', 'report' => 'تم إرسال البلاغ', 'favorite' => 'تم تحديث المفضلة', _ => 'تم حفظ الإجابة' };
+      final label = switch (action) { 'delete' => 'حُذفت الرسالة', 'report' => 'تم إرسال البلاغ', 'favorite' => 'تم تحديث المفضلة', 'unpublish' => 'تم إخفاء الإجابة المنشورة', _ => 'تم حفظ الإجابة' };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label)));
       await _load(refresh: true);
     } on ApiException catch (error) {

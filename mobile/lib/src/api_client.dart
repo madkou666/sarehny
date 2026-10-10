@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'api_config.dart';
 import 'models.dart';
 
 class ApiException implements Exception {
@@ -12,10 +13,10 @@ class ApiException implements Exception {
 
 class ApiClient {
   ApiClient({String? baseUrl})
-      : baseUrl = baseUrl ?? const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://sarehny.com/api/v1/'),
+      : baseUrl = _normalizeBaseUrl(baseUrl ?? ApiConfig.apiBaseUrl),
         _storage = const FlutterSecureStorage() {
     _dio = Dio(BaseOptions(
-      baseUrl: this.baseUrl.endsWith('/') ? this.baseUrl : '${this.baseUrl}/',
+      baseUrl: this.baseUrl,
       connectTimeout: const Duration(seconds: 12),
       sendTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 20),
@@ -38,6 +39,8 @@ class ApiClient {
       },
     ));
   }
+
+  static String _normalizeBaseUrl(String value) => value.endsWith('/') ? value : '$value/';
 
   final String baseUrl;
   final FlutterSecureStorage _storage;
@@ -65,9 +68,12 @@ class ApiClient {
   }
 
   Future<void> logout() async {
-    await _post('auth/logout', {});
-    await _storage.delete(key: 'sarehny_php_session');
-    _csrf = null;
+    try {
+      await _post('auth/logout', {});
+    } finally {
+      await _storage.delete(key: 'sarehny_php_session');
+      _csrf = null;
+    }
   }
 
   Future<Map<String, dynamic>> inbox({String filter = 'all', int page = 1, int limit = 20}) =>
@@ -86,8 +92,9 @@ class ApiClient {
   Future<Map<String, dynamic>> analyzePersonality() async {
     if (_csrf == null) await session();
     try {
+      final analysisEndpoint = Uri.parse(baseUrl).resolve('/ai_analyze.php').toString();
       final response = await _dio.post<Map<String, dynamic>>(
-        '/ai_analyze.php',
+        analysisEndpoint,
         data: FormData.fromMap({'csrf': _csrf ?? '', 'action': 'analyze', 'consent': '1', 'request_id': DateTime.now().microsecondsSinceEpoch.toString()}),
         options: Options(receiveTimeout: const Duration(seconds: 210)),
       );
@@ -114,8 +121,8 @@ class ApiClient {
   Future<Map<String, dynamic>> _request(String method, String path, {Map<String, dynamic>? query, Map<String, String>? fields}) async {
     try {
       final response = await _dio.request<Map<String, dynamic>>(
-        path,
-        queryParameters: query,
+        'index.php',
+        queryParameters: {'r': path, ...?query},
         data: fields == null ? null : FormData.fromMap(fields),
         options: Options(method: method),
       );

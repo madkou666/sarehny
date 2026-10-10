@@ -7,13 +7,21 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
+# Environment variables and local credentials
+.env
+.env.*
+!.env.example
 .env*.local
+/config.php
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+
+# Local PHP site configuration and test artifacts
+/deployment/config.php
+/deployment/testing/
 
 # Flutter and Android generated files / local signing credentials
 mobile/.dart_tool/
