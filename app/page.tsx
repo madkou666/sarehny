@@ -26,6 +26,16 @@ export default function Home() {
         <span className="hidden items-center gap-2 rounded-full border border-[#eae8f0] bg-white px-4 py-2 text-xs font-semibold text-[#596074] sm:flex"><ShieldCheck size={15} className="text-[#2f8f76]" /> معاينة تصميم Flutter</span>
         <a className="flex items-center gap-2 rounded-xl bg-[#7357c8] px-4 py-2.5 text-sm font-bold text-white" href="#inbox">المعاينة <ArrowUpLeft size={16} /></a>
       </header>
+      <section aria-labelledby="download-title" className="mx-auto mb-2 flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-5 sm:flex-row sm:px-8">
+        <div className="text-center sm:text-right">
+          <h2 id="download-title" className="text-sm font-extrabold">حمّل مشروع Sarehny لـ Android</h2>
+          <p className="mt-1 text-xs text-[#73788a]">ملفات Flutter وPHP API وAndroid كاملة بصيغة ZIP</p>
+        </div>
+        <a href="/downloads/saraha-android-project.zip" download className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
+          <Download size={17} aria-hidden="true" />
+          تنزيل المشروع ZIP
+        </a>
+      </section>
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-10 pt-8 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:gap-16 lg:pb-16 lg:pt-14">
         <div className="max-w-xl">
           <span className="inline-flex items-center gap-2 rounded-full bg-[#f0ecfb] px-3 py-1.5 text-xs font-bold text-[#7357c8]"><Sparkles size={14} /> تطبيق Android مستقل لموقعك</span>
@@ -43,16 +53,6 @@ export default function Home() {
           <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#f8f6fc] p-3"><div className="min-w-0"><small className="text-[10px] text-[#8b90a0]">رابطك الشخصي</small><p className="truncate text-xs font-semibold text-[#514b64]" dir="ltr">sarehny.com/yourname</p></div><button onClick={async () => { try { await navigator.clipboard.writeText('https://sarehny.com/yourname'); setCopied(true); window.setTimeout(() => setCopied(false), 1800) } catch { setCopied(false) } }} className="mr-3 flex shrink-0 items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#7357c8] shadow-sm">{copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'تم النسخ' : 'نسخ الرابط'}</button></div>
           <div className="mt-5 flex items-center justify-between rounded-2xl border border-dashed border-[#ddd7eb] px-4 py-3"><span><strong className="block text-sm">نسخة Android</strong><small className="text-xs text-[#8b90a0]">مصدر Flutter، وليس WebView</small></span><span className="size-2 rounded-full bg-[#2f8f76]" aria-label="تصميم RTL" /></div>
         </section>
-      </section>
-      <section aria-labelledby="download-title" className="mx-auto -mt-2 mb-10 flex w-full max-w-3xl flex-col items-center justify-between gap-5 rounded-3xl border border-[#e9e6f1] bg-white px-5 py-6 shadow-sm sm:flex-row sm:px-7">
-        <div className="text-center sm:text-right">
-          <h2 id="download-title" className="text-lg font-extrabold">جاهز للتجربة على Android Studio؟</h2>
-          <p className="mt-1 text-sm leading-6 text-[#73788a]">حمّل ملفات Flutter وPHP API وAndroid كاملة بصيغة ZIP، ثم اتبع دليل البناء المرفق.</p>
-        </div>
-        <a href="/downloads/saraha-android-project.zip" download className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
-          <Download size={17} aria-hidden="true" />
-          تنزيل المشروع ZIP
-        </a>
       </section>
       <footer className="mx-auto max-w-6xl px-5 pb-9 text-center text-xs leading-6 text-[#989cac] sm:px-8">هذه معاينة تفاعلية للتصميم ببيانات تجريبية فقط. تسجيل الدخول والبيانات الحقيقية تعمل من تطبيق Flutter بعد نشر API على الاستضافة.</footer>
     </main>
