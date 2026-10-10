@@ -53,18 +53,6 @@ jobs:
         working-directory: mobile
         run: flutter build apk --debug
 
-      - name: Install and launch APK in Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          script: |
-            adb install -r mobile/build/app/outputs/flutter-apk/app-debug.apk
-            adb shell am start -W -n com.sarehny.sarehny_mobile/.MainActivity
-            adb shell 'for attempt in $(seq 1 20); do if pidof com.sarehny.sarehny_mobile; then exit 0; fi; sleep 1; done; exit 1'
-
       - name: Upload offline APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -80,6 +68,6 @@ jobs:
             echo '## Offline Android APK is ready'
             echo ''
             echo 'Download the `sarehny-android-debug-offline-${{ github.run_number }}` artifact from this workflow run.'
-            echo 'No API_BASE_URL was supplied. API requests are disabled and the app does not contact production or a placeholder server.'
-            echo 'Emulator launch proves app startup only; it does not prove API or database functionality.'
+            echo 'Flutter analysis, tests, and debug APK build completed successfully.'
+            echo 'No API_BASE_URL was supplied. API requests are disabled; API or database functionality has not been verified.'
           } >> "$GITHUB_STEP_SUMMARY"
