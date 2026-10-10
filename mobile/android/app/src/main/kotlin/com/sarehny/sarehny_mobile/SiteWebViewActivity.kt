@@ -2,6 +2,7 @@ package com.sarehny.sarehny_mobile
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -184,7 +185,8 @@ class SiteWebViewActivity : Activity() {
         if (uri.userInfo != null || uri.host.isNullOrBlank() || uri.query != null || uri.fragment != null) return false
         if (uri.scheme == "https") return true
         val localDebugHost = uri.host in setOf("localhost", "127.0.0.1", "10.0.2.2")
-        return BuildConfig.DEBUG && uri.scheme == "http" && localDebugHost
+        val isDebug = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        return isDebug && uri.scheme == "http" && localDebugHost
     }
 
     private fun finishWithSession() {
@@ -242,6 +244,7 @@ class SiteWebViewActivity : Activity() {
         const val EXTRA_URL = "site_url"
         const val EXTRA_ORIGIN = "site_origin"
         const val EXTRA_SESSION_COOKIE = "session_cookie"
+        private const val FILE_CHOOSER_REQUEST_CODE = 7301
         private val SESSION_COOKIE = Regex("^PHPSESSID=[A-Za-z0-9,-]{8,256}$")
     }
 }
