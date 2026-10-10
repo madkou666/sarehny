@@ -142,7 +142,7 @@ class _AccountScreenState extends State<AccountScreen> {
     currentController.dispose();
     newController.dispose();
     confirmController.dispose();
-    if (values == null) return;
+    if (!mounted || values == null) return;
     if (values['new']!.length < 8 || values['new'] != values['confirm']) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تأكد من تطابق كلمة المرور الجديدة وأنها ٨ أحرف على الأقل.')));
       return;
