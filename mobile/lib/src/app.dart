@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api_client.dart';
-import 'api_config.dart';
 import 'app_theme.dart';
 import 'models.dart';
 import 'screens/account_screen.dart';
@@ -41,7 +40,13 @@ class _SarehnyAppState extends State<SarehnyApp> {
           future: _bootstrap,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) return const _SplashScreen();
-            if (snapshot.hasError) return _OfflineScreen(onRetry: () => setState(() => _bootstrap = _api.session()));
+            if (snapshot.hasError) {
+              return _OfflineScreen(
+                apiBaseUrl: _api.baseUrl,
+                error: snapshot.error!,
+                onRetry: () => setState(() => _bootstrap = _api.session()),
+              );
+            }
             if (snapshot.hasData) {
               final value = snapshot.data!['user'];
               if (value is Map<String, dynamic>) _user ??= AppUser.fromJson(value);
@@ -104,30 +109,53 @@ class _SplashScreen extends StatelessWidget {
 }
 
 class _OfflineScreen extends StatelessWidget {
-  const _OfflineScreen({required this.onRetry});
+  const _OfflineScreen({
+    required this.apiBaseUrl,
+    required this.error,
+    required this.onRetry,
+  });
+
+  final String apiBaseUrl;
+  final Object error;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) => Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          body: Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.cloud_off_outlined, size: 48, color: SarehnyColors.primary),
-            const SizedBox(height: 16),
-            Text(ApiConfig.isConfigured ? 'تعذّر الاتصال بخادم الاختبار' : 'الخادم غير مهيأ للاختبار', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              ApiConfig.isConfigured
-                  ? 'تحقق من اتصال خادم الاختبار وتوفّره، ثم حاول مرة أخرى.'
-                  : 'هذه نسخة آمنة بلا عنوان API افتراضي؛ لم يتم إرسال طلب إلى موقع الإنتاج أو إلى خادم وهمي. لاستخدام وظائف الحساب والرسائل، حدّد عنوان خادم اختبار حقيقي بعد تجهيزه.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cloud_off_outlined, size: 48, color: SarehnyColors.primary),
+                  const SizedBox(height: 16),
+                  Text('تعذّر الاتصال بخادم صراحة', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SarehnyColors.muted),
+                  ),
+                  if (apiBaseUrl.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SelectableText(
+                      'عنوان API المستخدم: $apiBaseUrl',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (ApiConfig.isConfigured) ...[
-              const SizedBox(height: 18),
-              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
-            ],
-          ]))),
+          ),
         ),
       );
 }

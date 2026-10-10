@@ -21,7 +21,7 @@ class ApiClient {
       sendTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 20),
       headers: {'Accept': 'application/json'},
-      validateStatus: (status) => status != null && status < 500,
+      validateStatus: (status) => status != null,
     ));
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -127,25 +127,39 @@ class ApiClient {
       throw const ApiException('الاتصال بالخادم غير مهيأ. لم يتم إرسال أي طلب API.');
     }
     try {
-      final response = await _dio.request<Map<String, dynamic>>(
+      final response = await _dio.request<dynamic>(
         'index.php',
         queryParameters: {'r': path, ...?query},
         data: fields == null ? null : FormData.fromMap(fields),
         options: Options(method: method),
       );
-      final data = response.data ?? <String, dynamic>{};
+      final payload = response.data;
+      final data = payload is Map
+          ? Map<String, dynamic>.from(payload)
+          : <String, dynamic>{};
       if (response.statusCode == null || response.statusCode! >= 400 || data['ok'] != true) {
         if (response.statusCode == 419) _csrf = data['csrf'] as String?;
-        throw ApiException(data['message'] as String? ?? 'تعذّر الاتصال بالخادم.', statusCode: response.statusCode);
+        final uri = response.requestOptions.uri;
+        final fallbackMessage = response.statusCode != null
+            ? 'استجابة HTTP ${response.statusCode} من ${uri.origin}${uri.path}. تحقق من نشر واجهة PHP على هذا المسار.'
+            : 'استجابة API غير صالحة.';
+        throw ApiException(
+          data['message'] as String? ?? fallbackMessage,
+          statusCode: response.statusCode,
+        );
       }
       if (data.containsKey('csrf')) _csrf = data['csrf'] as String?;
       return data;
     } on DioException catch (error) {
       final body = error.response?.data;
-      if (body is Map<String, dynamic> && body['message'] is String) {
+      if (body is Map && body['message'] is String) {
         throw ApiException(body['message'] as String, statusCode: error.response?.statusCode);
       }
-      throw const ApiException('تحقق من اتصال الإنترنت وحاول مجددًا.');
+      final uri = error.requestOptions.uri;
+      throw ApiException(
+        'تعذّر الاتصال بـ ${uri.origin}${uri.path} عبر HTTPS. تحقق من اتصال الإنترنت وتوفر واجهة API.',
+        statusCode: error.response?.statusCode,
+      );
     }
   }
 }
