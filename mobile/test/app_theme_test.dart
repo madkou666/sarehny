@@ -38,8 +38,10 @@ void main() {
         'radius': 100,
       });
 
-      expect(SarehnyPalette.defaults.canvas, const Color(0xFF0A0E1A));
-      expect(SarehnyPalette.defaults.primary, const Color(0xFF60A5FA));
+      expect(SarehnyPalette.defaults.canvas, const Color(0xFF06070A));
+      expect(SarehnyPalette.defaults.surface, const Color(0xFF0B0D12));
+      expect(SarehnyPalette.defaults.primary, const Color(0xFF3DF0C0));
+      expect(SarehnyPalette.defaults.secondary, const Color(0xFFFF4D8D));
       expect(palette.canvas, SarehnyPalette.defaults.canvas);
       expect(palette.primary, SarehnyPalette.defaults.primary);
       expect(palette.radius, 24);

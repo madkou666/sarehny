@@ -274,7 +274,7 @@ try {
       $stmt = $pdo->prepare('SELECT audio_path FROM messages WHERE id=? AND recipient_id=?');
       $stmt->execute([$id, $owner]);
       $audio = $stmt->fetchColumn();
-      if ($audio === false) api_error(404, 'لم نعثر على الرسالة.');
+      if ($audio === false) api_error(404, 'لم نعثر ع��ى الرسالة.');
       $pdo->prepare('DELETE FROM messages WHERE id=? AND recipient_id=?')->execute([$id, $owner]);
       if ($audio && preg_match('/^[a-f0-9]{32}\.[a-z0-9]{3,4}$/D', (string)$audio)) @unlink(dirname(__DIR__, 2) . '/uploads/voice/' . $audio);
       api_ok();
@@ -308,6 +308,64 @@ try {
   if ($method === 'GET' && $route === '/account') {
     $user = api_require_user();
     api_ok(['user' => api_safe_user($user), 'stats' => api_message_stats((int)$user['id'])]);
+  }
+
+  if ($method === 'POST' && $route === '/account/avatar') {
+    $user = api_require_user();
+    $upload = $_FILES['avatar'] ?? null;
+    if (!$upload || (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+      api_error(422, 'اختر صورة شخصية صالحة للرفع.');
+    }
+    if ((int)($upload['size'] ?? 0) < 1 || (int)$upload['size'] > 10 * 1024 * 1024) {
+      api_error(422, 'حجم الصورة يجب ألا يتجاوز ١٠ ميجابايت.');
+    }
+    if (!is_uploaded_file((string)$upload['tmp_name'])) api_error(422, 'ملف الصورة المرفوع غير صالح.');
+    $image = @getimagesize((string)$upload['tmp_name']);
+    $types = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif'];
+    $imageType = is_array($image) ? (int)($image[2] ?? 0) : 0;
+    if (!isset($types[$imageType])) {
+      api_error(422, 'صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WEBP أو GIF.');
+    }
+    if (function_exists('finfo_open')) {
+      $finfo = finfo_open(FILEINFO_MIME_TYPE);
+      $mime = $finfo ? (string)finfo_file($finfo, (string)$upload['tmp_name']) : '';
+      if ($finfo) finfo_close($finfo);
+      $expectedMime = [IMAGETYPE_JPEG => 'image/jpeg', IMAGETYPE_PNG => 'image/png', IMAGETYPE_WEBP => 'image/webp', IMAGETYPE_GIF => 'image/gif'];
+      if ($mime !== ($expectedMime[$imageType] ?? '')) api_error(422, 'محتوى الصورة لا يطابق صيغتها.');
+    }
+    $avatarDirectory = dirname(__DIR__, 2) . '/uploads/avatars';
+    if (!is_dir($avatarDirectory) && !@mkdir($avatarDirectory, 0755, true) && !is_dir($avatarDirectory)) {
+      api_error(500, 'تعذّر تجهيز مساحة حفظ الصورة.');
+    }
+    if (!is_writable($avatarDirectory)) api_error(500, 'مساحة حفظ الصور غير قابلة للكتابة.');
+    $avatarName = bin2hex(random_bytes(16)) . '.' . $types[$imageType];
+    $avatarPath = $avatarDirectory . '/' . $avatarName;
+    if (!move_uploaded_file((string)$upload['tmp_name'], $avatarPath)) api_error(500, 'تعذّر حفظ الصورة. حاول مجددًا.');
+    try {
+      $pdo->prepare('UPDATE users SET avatar=? WHERE id=?')->execute([$avatarName, (int)$user['id']]);
+    } catch (Throwable $error) {
+      @unlink($avatarPath);
+      throw $error;
+    }
+    $oldAvatar = (string)($user['avatar'] ?? '');
+    if ($oldAvatar !== '' && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', $oldAvatar)) {
+      @unlink($avatarDirectory . '/' . $oldAvatar);
+    }
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE id=?');
+    $stmt->execute([(int)$user['id']]);
+    api_ok(['user' => api_safe_user($stmt->fetch())]);
+  }
+
+  if ($method === 'POST' && $route === '/account/avatar/remove') {
+    $user = api_require_user();
+    $oldAvatar = (string)($user['avatar'] ?? '');
+    $pdo->prepare('UPDATE users SET avatar=NULL WHERE id=?')->execute([(int)$user['id']]);
+    if ($oldAvatar !== '' && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', $oldAvatar)) {
+      @unlink(dirname(__DIR__, 2) . '/uploads/avatars/' . $oldAvatar);
+    }
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE id=?');
+    $stmt->execute([(int)$user['id']]);
+    api_ok(['user' => api_safe_user($stmt->fetch())]);
   }
 
   if ($method === 'POST' && $route === '/account/profile') {
@@ -346,7 +404,9 @@ try {
     $check->execute([$email, (int)$user['id']]);
     if ($check->fetchColumn()) api_error(409, 'البريد مستخدم بالفعل.');
     $pdo->prepare('UPDATE users SET email=? WHERE id=?')->execute([$email, (int)$user['id']]);
-    api_ok();
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE id=?');
+    $stmt->execute([(int)$user['id']]);
+    api_ok(['user' => api_safe_user($stmt->fetch())]);
   }
 
   if ($method === 'POST' && $route === '/account/password') {

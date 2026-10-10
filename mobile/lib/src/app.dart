@@ -9,6 +9,7 @@ import 'screens/account_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/public_message_screen.dart';
+import 'screens/site_hub_screen.dart';
 
 class SarehnyApp extends StatefulWidget {
   const SarehnyApp({super.key});
@@ -23,10 +24,12 @@ class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
   AppUser? _user;
   SarehnyPalette _palette = SarehnyPalette.defaults;
   int _themeRequestId = 0;
+  bool _refreshingSession = false;
 
   @override
   void initState() {
     super.initState();
+    _api.onUnauthorized = () => unawaited(_refreshSession());
     WidgetsBinding.instance.addObserver(this);
     _themeRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       unawaited(_refreshTheme());
@@ -37,7 +40,36 @@ class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refreshTheme());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshTheme());
+      unawaited(_refreshSession());
+    }
+  }
+
+  Future<void> _refreshSession() async {
+    if (_refreshingSession) return;
+    _refreshingSession = true;
+    try {
+      final data = await _api.session();
+      final value = data['user'];
+      final refreshedUser = value is Map<String, dynamic> ? AppUser.fromJson(value) : null;
+      if (mounted &&
+          (refreshedUser?.id != _user?.id ||
+              refreshedUser?.username != _user?.username ||
+              refreshedUser?.displayName != _user?.displayName ||
+              refreshedUser?.email != _user?.email ||
+              refreshedUser?.avatarUrl != _user?.avatarUrl ||
+              refreshedUser?.isAdmin != _user?.isAdmin ||
+              refreshedUser?.insightsEnabled != _user?.insightsEnabled)) {
+        setState(() {
+          _user = refreshedUser;
+          _bootstrap = Future<Map<String, dynamic>>.value(data);
+        });
+      }
+    } catch (_) {
+    } finally {
+      _refreshingSession = false;
+    }
   }
 
   @override
@@ -67,7 +99,16 @@ class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
   void _setUser(AppUser? user) => setState(() => _user = user);
 
   Future<void> _logout() async {
-    try { await _api.logout(); } finally { if (mounted) _setUser(null); }
+    try {
+      await _api.logout();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _user = null;
+          _bootstrap = _api.session();
+        });
+      }
+    }
   }
 
   @override
@@ -97,17 +138,23 @@ class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
               if (value is Map<String, dynamic>) _user ??= AppUser.fromJson(value);
             }
             if (_user == null) return LoginScreen(api: _api, onSignedIn: _setUser);
-            return _HomeShell(api: _api, user: _user!, onLogout: _logout);
+            return _HomeShell(
+              api: _api,
+              user: _user!,
+              onLogout: _logout,
+              onUserUpdated: (user) => _setUser(user),
+            );
           },
         ),
       );
 }
 
 class _HomeShell extends StatefulWidget {
-  const _HomeShell({required this.api, required this.user, required this.onLogout});
+  const _HomeShell({required this.api, required this.user, required this.onLogout, required this.onUserUpdated});
   final ApiClient api;
   final AppUser user;
   final Future<void> Function() onLogout;
+  final ValueChanged<AppUser> onUserUpdated;
   @override
   State<_HomeShell> createState() => _HomeShellState();
 }
@@ -119,14 +166,26 @@ class _HomeShellState extends State<_HomeShell> {
         textDirection: TextDirection.rtl,
         child: Scaffold(
           body: IndexedStack(index: _index, children: [
+            SiteHubScreen(
+              api: widget.api,
+              displayName: widget.user.displayName,
+              username: widget.user.username,
+              isAdmin: widget.user.isAdmin,
+            ),
             InboxScreen(api: widget.api),
             PublicMessageScreen(api: widget.api),
-            AccountScreen(api: widget.api, user: widget.user, onLogout: widget.onLogout),
+            AccountScreen(
+              api: widget.api,
+              user: widget.user,
+              onLogout: widget.onLogout,
+              onUserUpdated: widget.onUserUpdated,
+            ),
           ]),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _index,
             onDestinationSelected: (index) => setState(() => _index = index),
             destinations: const [
+              NavigationDestination(icon: Icon(Icons.apps_outlined), selectedIcon: Icon(Icons.apps_rounded), label: 'الموقع'),
               NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox_rounded), label: 'الرسائل'),
               NavigationDestination(icon: Icon(Icons.send_outlined), selectedIcon: Icon(Icons.send_rounded), label: 'إرسال'),
               NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'حسابي'),

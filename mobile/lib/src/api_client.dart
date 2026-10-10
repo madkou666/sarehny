@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -49,10 +50,20 @@ class ApiClient {
   }
 
   final String baseUrl;
-  Uri get adminUrl => Uri.parse(baseUrl).resolve('../../admin.php');
+  Uri get siteOrigin => Uri.parse(baseUrl).resolve('../../');
+  Uri get adminUrl => sitePage('admin.php');
+
+  Uri sitePage(String path, {Map<String, String>? queryParameters}) {
+    if (baseUrl.isEmpty || !RegExp(r'^[a-zA-Z0-9_-]+(?:\.php)?$').hasMatch(path)) {
+      throw const ApiException('رابط صفحة الموقع غير صالح أو أن عنوان API غير مهيأ.');
+    }
+    return siteOrigin.resolve(path).replace(queryParameters: queryParameters);
+  }
+
   final FlutterSecureStorage _storage;
   late final Dio _dio;
   String? _csrf;
+  void Function()? onUnauthorized;
 
   Future<Map<String, dynamic>> session() async {
     final data = await _request('GET', 'session');
@@ -124,13 +135,46 @@ class ApiClient {
   Future<void> messageAction(int id, String action, {Map<String, String> fields = const {}}) async =>
       _post('messages/$id/$action', fields);
 
-  Future<void> updateProfile(String name) async => _post('account/profile', {'name': name});
+  Future<AppUser> updateProfile(String name) async {
+    final data = await _post('account/profile', {'name': name});
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+  }
+
+  Future<String?> readPhpSessionCookie() => _storage.read(key: 'sarehny_php_session');
+
+  Future<void> savePhpSessionCookie(String cookie) async {
+    if (!RegExp(r'^PHPSESSID=[A-Za-z0-9,-]{8,256}$').hasMatch(cookie)) {
+      throw const ApiException('تعذّر تحديث جلسة الموقع بسبب استجابة غير صالحة.');
+    }
+    await _storage.write(key: 'sarehny_php_session', value: cookie);
+  }
+
+  Future<AppUser> uploadAvatar(Uint8List bytes, {required String fileName}) async {
+    if (_csrf == null) await session();
+    final data = await _request(
+      'POST',
+      'account/avatar',
+      formData: FormData.fromMap({
+        'csrf': _csrf ?? '',
+        'avatar': MultipartFile.fromBytes(bytes, filename: fileName),
+      }),
+    );
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+  }
+
+  Future<AppUser> removeAvatar() async {
+    final data = await _post('account/avatar/remove', {});
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+  }
+
   Future<AppUser> updateUsername(String username) async {
     final data = await _post('account/username', {'username': username});
     return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
   }
-  Future<void> updateEmail(String email, String currentPassword) async =>
-      _post('account/email', {'email': email, 'current_password': currentPassword});
+  Future<AppUser> updateEmail(String email, String currentPassword) async {
+    final data = await _post('account/email', {'email': email, 'current_password': currentPassword});
+    return AppUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+  }
   Future<void> updatePassword(String currentPassword, String newPassword) async =>
       _post('account/password', {'current_password': currentPassword, 'new_password': newPassword});
   Future<void> deleteAccount(String currentPassword, String username) async {
@@ -173,7 +217,7 @@ class ApiClient {
     return _request('POST', path, fields: {'csrf': _csrf ?? '', ...fields});
   }
 
-  Future<Map<String, dynamic>> _request(String method, String path, {Map<String, dynamic>? query, Map<String, String>? fields}) async {
+  Future<Map<String, dynamic>> _request(String method, String path, {Map<String, dynamic>? query, Map<String, String>? fields, FormData? formData}) async {
     if (baseUrl.isEmpty) {
       throw const ApiException('الاتصال بالخادم غير مهيأ. لم يتم إرسال أي طلب API.');
     }
@@ -181,7 +225,7 @@ class ApiClient {
       final response = await _dio.request<dynamic>(
         'index.php',
         queryParameters: {'r': path, ...?query},
-        data: fields == null ? null : FormData.fromMap(fields),
+        data: formData ?? (fields == null ? null : FormData.fromMap(fields)),
         options: Options(method: method),
       );
       final payload = response.data;
@@ -190,6 +234,7 @@ class ApiClient {
           : <String, dynamic>{};
       if (response.statusCode == null || response.statusCode! >= 400 || data['ok'] != true) {
         if (response.statusCode == 419) _csrf = data['csrf'] as String?;
+        if (response.statusCode == 401 && !path.startsWith('auth/')) onUnauthorized?.call();
         final uri = response.requestOptions.uri;
         final fallbackMessage = response.statusCode != null
             ? 'استجابة HTTP ${response.statusCode} من ${uri.origin}${uri.path}. تحقق من نشر واجهة PHP على هذا المسار.'

@@ -1,14 +1,18 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../api_client.dart';
 import '../app_theme.dart';
 import '../models.dart';
+import '../site_browser.dart';
 
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key, required this.api, required this.user, required this.onLogout});
+  const AccountScreen({super.key, required this.api, required this.user, required this.onLogout, required this.onUserUpdated});
   final ApiClient api;
   final AppUser user;
   final Future<void> Function() onLogout;
+  final ValueChanged<AppUser> onUserUpdated;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
@@ -18,8 +22,24 @@ class _AccountScreenState extends State<AccountScreen> {
   late String _username = widget.user.username;
   late String _email = widget.user.email;
   late String _publicUrl = widget.user.publicUrl;
+  String? _avatarUrl;
+  bool _avatarUpdated = false;
+  String? get _currentAvatarUrl => _avatarUpdated ? _avatarUrl : widget.user.avatarUrl;
   bool _analyzing = false;
   bool _updating = false;
+
+  @override
+  void didUpdateWidget(covariant AccountScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.displayName != widget.user.displayName) _displayName = widget.user.displayName;
+    if (oldWidget.user.username != widget.user.username) _username = widget.user.username;
+    if (oldWidget.user.publicUrl != widget.user.publicUrl) _publicUrl = widget.user.publicUrl;
+    if (oldWidget.user.email != widget.user.email) _email = widget.user.email;
+    if (oldWidget.user.avatarUrl != widget.user.avatarUrl) {
+      _avatarUrl = null;
+      _avatarUpdated = false;
+    }
+  }
 
   Future<void> _editName() async {
     final controller = TextEditingController(text: _displayName);
@@ -28,8 +48,12 @@ class _AccountScreenState extends State<AccountScreen> {
     if (name == null || name.length < 2) return;
     setState(() => _updating = true);
     try {
-      await widget.api.updateProfile(name);
-      if (mounted) { setState(() => _displayName = name); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث الاسم على حسابك.'))); }
+      final updated = await widget.api.updateProfile(name);
+      if (mounted) {
+        setState(() => _displayName = updated.displayName);
+        widget.onUserUpdated(updated);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث الاسم على حسابك.')));
+      }
     } on ApiException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     } finally { if (mounted) setState(() => _updating = false); }
@@ -66,6 +90,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _username = updated.username;
           _publicUrl = updated.publicUrl;
         });
+        widget.onUserUpdated(updated);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تغيير اسم المستخدم والرابط الشخصي.')));
       }
     } on ApiException catch (error) {
@@ -102,9 +127,10 @@ class _AccountScreenState extends State<AccountScreen> {
     if (values == null) return;
     setState(() => _updating = true);
     try {
-      await widget.api.updateEmail(values['email']!, values['password']!);
+      final updated = await widget.api.updateEmail(values['email']!, values['password']!);
       if (mounted) {
-        setState(() => _email = values['email']!);
+        setState(() => _email = updated.email);
+        widget.onUserUpdated(updated);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث البريد الإلكتروني.')));
       }
     } on ApiException catch (error) {
@@ -198,14 +224,83 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Future<void> _openAdmin() async {
     try {
-      await const MethodChannel('com.sarehny/external_browser').invokeMethod<void>(
-        'open',
-        {'url': widget.api.adminUrl.toString()},
-      );
-    } on PlatformException {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذّر فتح لوحة الإدارة في المتصفح.')));
+      await SiteBrowser.open(widget.api, 'admin.php');
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر فتح لوحة الإدارة داخل التطبيق.')));
+    } on ApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _selectAvatar() async {
+    if (_updating) return;
+    setState(() => _updating = true);
+    try {
+      final selection = await NativeImagePicker.pickImage();
+      if (!mounted || selection == null) return;
+      final bytes = selection['bytes'];
+      final mimeType = selection['mimeType'];
+      final extension = switch (mimeType) {
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+        _ => null,
+      };
+      if (bytes is! Uint8List || bytes.isEmpty || bytes.length > 10 * 1024 * 1024 || extension == null) {
+        throw const ApiException('اختر صورة JPG أو PNG أو WEBP أو GIF لا تتجاوز ١٠ ميجابايت.');
+      }
+      final updated = await widget.api.uploadAvatar(bytes, fileName: 'avatar.$extension');
+      if (mounted) {
+        setState(() {
+          _avatarUrl = updated.avatarUrl;
+          _avatarUpdated = true;
+        });
+        widget.onUserUpdated(updated);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورتك الشخصية.')));
+      }
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر اختيار الصورة.')));
     } on MissingPluginException {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فتح المتصفح غير متاح على هذا الجهاز.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اختيار الصور غير متاح على هذا الجهاز.')));
+    } on ApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _updating = false);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('حذف الصورة الشخصية؟'),
+          content: const Text('ستُحذف الصورة الشخصية من حسابك.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف الصورة')),
+          ],
+        ),
+      ),
+    );
+    if (approved != true || !mounted) return;
+    setState(() => _updating = true);
+    try {
+      final updated = await widget.api.removeAvatar();
+      if (mounted) {
+        setState(() {
+          _avatarUrl = null;
+          _avatarUpdated = true;
+        });
+        widget.onUserUpdated(updated);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الصورة الشخصية.')));
+      }
+    } on ApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _updating = false);
     }
   }
 
@@ -241,11 +336,15 @@ class _AccountScreenState extends State<AccountScreen> {
     appBar: AppBar(title: const Text('حسابي')),
     body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 30), children: [
       Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(children: [
-        CircleAvatar(radius: 38, backgroundColor: Theme.of(context).extension<SarehnyPalette>()!.primarySoft, foregroundImage: widget.user.avatarUrl == null ? null : NetworkImage(widget.user.avatarUrl!), child: widget.user.avatarUrl == null ? Text(_displayName.isEmpty ? 'ص' : String.fromCharCode(_displayName.runes.first), style: TextStyle(fontSize: 25, color: Theme.of(context).extension<SarehnyPalette>()!.primary, fontWeight: FontWeight.w800)) : null),
+        CircleAvatar(radius: 38, backgroundColor: Theme.of(context).extension<SarehnyPalette>()!.primarySoft, foregroundImage: _currentAvatarUrl == null ? null : NetworkImage(_currentAvatarUrl!), child: _currentAvatarUrl == null ? Text(_displayName.isEmpty ? 'ص' : String.fromCharCode(_displayName.runes.first), style: TextStyle(fontSize: 25, color: Theme.of(context).extension<SarehnyPalette>()!.primary, fontWeight: FontWeight.w800)) : null),
         const SizedBox(height: 12), Text(_displayName, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4), Text('@$_username', textDirection: TextDirection.ltr, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 18),
         FilledButton.icon(onPressed: _updating ? null : _editName, icon: _updating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.edit_outlined), label: const Text('تعديل الاسم الظاهر')),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(onPressed: _updating ? null : _selectAvatar, icon: const Icon(Icons.photo_camera_outlined), label: const Text('تغيير الصورة الشخصية')),
+        if (_currentAvatarUrl != null)
+          TextButton.icon(onPressed: _updating ? null : _removeAvatar, icon: const Icon(Icons.delete_outline_rounded), label: const Text('حذف الصورة الحالية')),
       ]))),
       const SizedBox(height: 16),
       Card(child: Column(children: [
@@ -266,7 +365,7 @@ class _AccountScreenState extends State<AccountScreen> {
         ListTile(leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error), title: Text('حذف الحساب نهائيًا', style: TextStyle(color: Theme.of(context).colorScheme.error)), subtitle: const Text('يتطلب تأكيد اسم المستخدم وكلمة المرور'), onTap: _updating ? null : _deleteAccount),
         if (widget.user.isAdmin) ...[
           const Divider(height: 1, indent: 16, endIndent: 16),
-          ListTile(leading: Icon(Icons.admin_panel_settings_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('لوحة الإدارة'), subtitle: const Text('تُفتح في المتصفح وتستخدم تسجيل الموقع المعتاد'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _openAdmin),
+          ListTile(leading: Icon(Icons.admin_panel_settings_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('لوحة الإدارة'), subtitle: const Text('تُفتح داخل التطبيق مع التحقق من صلاحية الموقع'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _openAdmin),
         ],
       ])),
       const SizedBox(height: 16),

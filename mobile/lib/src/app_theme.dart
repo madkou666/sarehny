@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 
 class SarehnyColors {
-  static const ink = Color(0xFFF3F4F6);
-  static const ink2 = Color(0xFFD1D5DB);
-  static const muted = Color(0xFF9CA3AF);
-  static const canvas = Color(0xFF0A0E1A);
-  static const surface = Color(0xFF111827);
-  static const raised = Color(0xFF1F2937);
-  static const primary = Color(0xFF60A5FA);
-  static const secondary = Color(0xFFF472B6);
-  static const mint = Color(0xFF34D399);
-  static const line = Color(0xFF283247);
-  static const warning = Color(0xFFFBBF24);
-  static const danger = Color(0xFFF87171);
-  static const info = Color(0xFF93C5FD);
+  static const ink = Color(0xFFEEF1F2);
+  static const ink2 = Color(0xFFC4CCD1);
+  static const muted = Color(0xFF8F9AA7);
+  static const canvas = Color(0xFF06070A);
+  static const surface = Color(0xFF0B0D12);
+  static const raised = Color(0xFF202328);
+  static const primary = Color(0xFF3DF0C0);
+  static const secondary = Color(0xFFFF4D8D);
+  static const mint = Color(0xFF3DF0C0);
+  static const line = Color(0xFF262B34);
+  static const warning = Color(0xFFF5C14E);
+  static const danger = Color(0xFFFF6C96);
+  static const info = Color(0xFF82ABFF);
 }
 
 @immutable
