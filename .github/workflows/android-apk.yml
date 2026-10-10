@@ -1,4 +1,4 @@
-name: Build Android APK (API disabled)
+name: Build Android APK (production API configured)
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Analyze, test, and build offline debug APK
+    name: Analyze, test, and build production-API debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -45,29 +45,31 @@ jobs:
         working-directory: mobile
         run: flutter analyze
 
-      - name: Run Flutter tests
+      - name: Run Flutter tests without API configuration
         working-directory: mobile
         run: flutter test
 
-      - name: Build offline installable debug APK
+      - name: Build APK with production API base URL
         working-directory: mobile
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=API_BASE_URL=https://sarehny.com/api/v1/
 
-      - name: Upload offline APK artifact
+      - name: Upload production-API APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sarehny-android-debug-offline-${{ github.run_number }}
+          name: sarehny-android-production-api-debug-${{ github.run_number }}
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Summarize safe build
+      - name: Summarize APK configuration
         if: success()
         run: |
           {
-            echo '## Offline Android APK is ready'
+            echo '## Production-API-configured Android APK is ready'
             echo ''
-            echo 'Download the `sarehny-android-debug-offline-${{ github.run_number }}` artifact from this workflow run.'
-            echo 'Flutter analysis, tests, and debug APK build completed successfully.'
-            echo 'No API_BASE_URL was supplied. API requests are disabled; API or database functionality has not been verified.'
+            echo 'Download the `sarehny-android-production-api-debug-${{ github.run_number }}` artifact from this workflow run.'
+            echo 'Flutter analysis, unit/widget tests, and the debug APK build completed successfully.'
+            echo 'The APK is configured for https://sarehny.com/api/v1/. CI tests ran without an API URL and did not contact the production server.'
+            echo 'This confirms build configuration only; production endpoint availability, login, inbox reads, and message sending were not tested.'
+            echo 'This is a debug APK and is not a signed release build.'
           } >> "$GITHUB_STEP_SUMMARY"
