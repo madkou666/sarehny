@@ -37,7 +37,7 @@ class MessageCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: reason,
+                  initialValue: reason,
                   decoration: const InputDecoration(labelText: 'سبب البلاغ'),
                   items: const [
                     DropdownMenuItem(value: 'harassment', child: Text('مضايقة')),
