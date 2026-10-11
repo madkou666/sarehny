@@ -23,6 +23,12 @@ void main() {
     expect((session['csrf'] as String).isNotEmpty, isTrue);
     expect(session['user'], isNull);
 
+    final sessionCookie = await api.readPhpSessionCookie();
+    expect(sessionCookie, matches(RegExp(r'^PHPSESSID=[A-Za-z0-9,-]{8,256}$')));
+    final repeatedSession = await api.session();
+    expect(repeatedSession['csrf'], isA<String>());
+    expect(await api.readPhpSessionCookie(), sessionCookie);
+
     await expectLater(
       api.login('', ''),
       throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),

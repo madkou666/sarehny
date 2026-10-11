@@ -17,35 +17,42 @@ Future<void> _settle(WidgetTester tester) => tester.pumpAndSettle(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('staging login, profile, message delivery, deletion, and logout', (tester) async {
+  testWidgets('staging login, account setting, inbox, message delivery, deletion, and logout', (tester) async {
     if (_apiBaseUrl.isEmpty || _stagingUsername.isEmpty || _stagingPassword.isEmpty) {
       fail('Configure API_BASE_URL and dedicated staging credentials before running this test.');
     }
 
     final marker = 'اختبار تكامل صراحة ${DateTime.now().millisecondsSinceEpoch}';
     var messageMayExist = false;
+    var profileMayHaveChanged = false;
+    String? originalDisplayName;
     final cleanupApi = ApiClient(baseUrl: _apiBaseUrl);
 
     addTearDown(() async {
-      if (!messageMayExist) return;
+      if (!messageMayExist && !profileMayHaveChanged) return;
       try {
         final session = await cleanupApi.session();
         final currentUser = session['user'];
         if (currentUser is! Map || currentUser['username'] != _stagingUsername) {
           await cleanupApi.login(_stagingUsername, _stagingPassword);
         }
-        final inbox = await cleanupApi.inbox(limit: 50);
-        final messages = inbox['messages'];
-        if (messages is List) {
-          for (final item in messages) {
-            if (item is Map && item['body'] == marker && item['id'] is num) {
-              await cleanupApi.messageAction((item['id'] as num).toInt(), 'delete');
+        if (profileMayHaveChanged && originalDisplayName != null) {
+          await cleanupApi.updateProfile(originalDisplayName!);
+        }
+        if (messageMayExist) {
+          final inbox = await cleanupApi.inbox(limit: 50);
+          final messages = inbox['messages'];
+          if (messages is List) {
+            for (final item in messages) {
+              if (item is Map && item['body'] == marker && item['id'] is num) {
+                await cleanupApi.messageAction((item['id'] as num).toInt(), 'delete');
+              }
             }
           }
         }
         await cleanupApi.logout();
       } on Object catch (error) {
-        fail('Staging cleanup failed (${error.runtimeType}); remove only the test message beginning "$marker" from the dedicated staging account.');
+        fail('Staging cleanup failed (${error.runtimeType}); verify the dedicated test account and remove only this run’s test data.');
       }
     });
 
@@ -69,6 +76,25 @@ void main() {
     await _settle(tester);
     expect(find.text('اسم المستخدم'), findsOneWidget);
     expect(find.text('@$_stagingUsername'), findsWidgets);
+
+    final account = await cleanupApi.account();
+    final accountUser = account['user'];
+    expect(accountUser, isA<Map>());
+    originalDisplayName = (accountUser as Map)['display_name'] as String?;
+    expect(originalDisplayName, isNotNull);
+    final updatedDisplayName = 'اختبار صراحة ${DateTime.now().millisecondsSinceEpoch}';
+    profileMayHaveChanged = true;
+    await tester.tap(find.widgetWithText(FilledButton, 'تعديل الاسم الظاهر'));
+    await _settle(tester);
+    await tester.enterText(find.byType(TextField).last, updatedDisplayName);
+    await tester.tap(find.widgetWithText(FilledButton, 'حفظ'));
+    await _settle(tester);
+    expect(find.text('تم تحديث الاسم على حسابك.'), findsOneWidget);
+    final updatedAccount = await cleanupApi.account();
+    expect((updatedAccount['user'] as Map)['display_name'], updatedDisplayName);
+    final restoredUser = await cleanupApi.updateProfile(originalDisplayName!);
+    expect(restoredUser.displayName, originalDisplayName);
+    profileMayHaveChanged = false;
 
     await tester.tap(find.text('إرسال').last);
     await _settle(tester);
