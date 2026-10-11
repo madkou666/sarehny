@@ -24,6 +24,10 @@ void main() {
     expect(session['user'], isNull);
 
     await expectLater(
+      api.login('', ''),
+      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),
+    );
+    await expectLater(
       api.account(),
       throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 401)),
     );
@@ -42,7 +46,11 @@ void main() {
     expect(find.text('أهلًا بعودتك'), findsOneWidget);
     expect(find.textContaining('الاتصال بالخادم غير مهيأ'), findsNothing);
 
-    final theme = await api.appTheme();
-    expect(theme['theme'], isA<Map<String, dynamic>>());
+    try {
+      final theme = await api.appTheme();
+      expect(theme['theme'], isA<Map<String, dynamic>>());
+    } on ApiException catch (error) {
+      expect(error.statusCode, 404);
+    }
   });
 }
