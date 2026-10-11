@@ -135,4 +135,29 @@ flutter.sdk=/المسار/إلى/flutter
 
 فحص HTTPS على `https://sarehny.com/api/v1/index.php?r=session` أعاد `200` مع CSRF و`user: null`. عنوان الجلسة المعتمد للتطبيق هو `GET /api/v1/index.php?r=session`، وليس `/api/v1/session`. وأعاد `POST /api/v1/index.php?r=auth/login` عند تمرير CSRF الصحيح وحقول دخول فارغة `422` من مدقق الحقول، دون استعلام حساب أو تغيير بيانات. أعاد `GET ...?r=account` و`GET ...?r=inbox` `401 unauthenticated` بلا جلسة، وأعاد `public-profile` مع اسم غير صالح `422`. عميل Flutter يستخدم الصيغ المعتمدة هذه؛ لم أبدلها بمسارات مفترضة. لكن `GET ...?r=app-theme` يعيد `404 not_found` خلافًا للملف المحلي، ما يثبت أن نسخة PHP على Hostinger ليست مطابقة تمامًا لحزمة المشروع. لم نتمكن من قراءة مصدر PHP البعيد مباشرةً أو مقارنة checksum له؛ تمت المقارنة عبر السلوك الحي.
 
-لم تُنشر أي ملفات إلى Hostinger ولم تُعدّل قاعدة البيانات. من المصدر المحلي، `deployment/api/v1/index.php` يعرّف `GET /api/v1/index.php?r=app-theme`، لكن المضيف الحي يعيد `404 not_found` أيضًا لـ`r=theme` و`r=theme-public` ولا يوفّر مسارًا مباشرًا بديلًا؛ لذلك لا يوجد مسار قائم يمكن Flutter التحويل إليه. لا يمكن قراءة PHP المنشور أو checksum له من HTTPS، لذا يثبت الفحص عدم تطابق عقد الاستجابة فقط، ولا يحسم هل السبب نسخة قديمة أو مجلد document root مختلف أو تخزين opcode. بعد أخذ نسخة احتياطية، استبدل الملف **`<document-root>/api/v1/index.php`** فقط بمحتوى `api/v1/index.php` من `deployment/hostinger-api-v1.zip` (في Hostinger يكون جذر الموقع غالبًا `public_html`، أي `public_html/api/v1/index.php`). اترك `<document-root>/inc.php` وملفات الموقع وقاعدة البيانات دون تغيير؛ لا حاجة لتعديل `.htaccess` لمسار `index.php?r=...` أو لإعداد الجلسة. ثم أعد فحص `GET /api/v1/index.php?r=app-theme` وتأكد من `HTTP 200` و`ok:true` قبل اعتبار إصلاح المظهر منشورًا. لا ترفع `.htaccess` إلا إذا أردت دعم alias الاختياري `/api/v1/session`، وتحقق حينها من سماح Hostinger بـ`mod_rewrite` و`AllowOverride`; Flutter لا يستخدم alias. لم تُجرَ محاولة دخول بكلمة مرور، ولا تتوفر في هذا التشغيل بيئة/بيانات staging موثقة، لذا لم تُختبر حسابات الملف الشخصي الخاصة أو تسليم الرسائل. يلزم عنوان staging معزول وحساب اختبار مضبوطان في أسرار GitHub (`SAREHNY_STAGING_USERNAME` و`SAREHNY_STAGING_PASSWORD`) لتشغيل اختبار الدخول والرسائل والتنظيف الآمن دون لمس الإنتاج.
+لم أرفع أو أعدّل أي ملف على Hostinger أو قاعدة البيانات. من الأدلة الحية: `session` يُنفّذ عبر `index.php?r=...` ويعيد JSON، بينما `r=app-theme` يرجع JSON من fallback الخاص بالتطبيق (`code:not_found`). إذن عنوان Flutter وصيغة query يصلان إلى PHP؛ الملف الذي يخدم `api/v1/index.php` لا يحتوي حاليًا على معالج `app-theme`، وليس هذا خلل rewrite أو حاجة لتغيير عنوان التطبيق. لا يمكن من HTTPS وحده التمييز بين نسخة API قديمة وdocument root مختلف، ولا قراءة الملف أو checksum المنشور. `theme-public` ليس route في عميل Flutter ولا في مصدر API المحلي؛ العقد المستخدم هو `app-theme`، لذلك لا تضف alias غير مطلوب.
+
+**التعديل اليدوي المقترح بعد نسخة احتياطية، دون استبدال الملف:** في Hostinger File Manager نزّل نسخة من **`<document-root>/api/v1/index.php`** (غالبًا `public_html/api/v1/index.php`) واحفظها خارج مجلد الموقع. قارنها بـ`deployment/api/v1/index.php`، ثم أضف فقط كتلة معالج المظهر إن لم تكن موجودة؛ أبقِ كل الدوال والمسارات الأخرى كما هي. اعتمد `theme_fields()` و`setting()` الموجودتين في `inc.php` و`api_ok()` ومعالجة المسار الحالية. ضع الدالة المساعدة قرب دوال API الأخرى، قبل قراءة/dispatch المسارات:
+
+```php
+function api_public_theme() {
+  $colors = [];
+  foreach (theme_fields() as $key => $field) {
+    $value = (string)setting('theme_' . $key, $field[1]);
+    $colors[$key] = preg_match('/^#[0-9a-fA-F]{6}$/D', $value) ? strtolower($value) : $field[1];
+  }
+  return ['colors' => $colors, 'radius' => max(0, min(24, (int)setting('ui_radius', '8')))];
+}
+```
+
+وقبل معالج `/session` أو fallback `not_found` داخل dispatch، أضف:
+
+```php
+if ($method === 'GET' && $route === '/app-theme') {
+  api_ok(['theme' => api_public_theme()]);
+}
+```
+
+إذا اختلف هيكل الملف المنشور عن هذا، لا تلصق البلوك عشوائيًا؛ طابق موضع fallback وصيغة المتغيرات أولًا. احفظ الملف بعد التعديل مع إبقاء `inc.php` و`.htaccess` وسائر ملفات الموقع وقاعدة البيانات دون تغيير. تحقق بعدها من `GET https://sarehny.com/api/v1/index.php?r=app-theme`؛ المطلوب `200` وJSON فيه `ok:true` و`theme.colors` و`theme.radius`. إذا استمر `not_found`، أعد الملف الاحتياطي وافحص أن المسار هو document root الفعلي وأن Hostinger لا يقدّم نسخة PHP مخزنة مؤقتًا. لا يمكنني تنفيذ هذه الخطوات داخل v0.
+
+كود PHP المحلي يرفض تسجيل الدخول بـ`422` عند تحقق الشرط: `identifier === ''` أو طول `identifier` أكبر من 190 أو طول `password` أكبر من 1024. الطلب الآمن الذي أُعيد هنا مرّر CSRF صالحًا و`identifier=''` و`password=''`؛ إذن **سبب 422 لذلك الطلب تحديدًا هو حقل identifier الفارغ** (كلمة المرور الفارغة لا تحقق شرط حد الطول)، لا أسماء الحقول ولا CSRF. عميل Flutter يرسل `identifier` و`password` كحقول form؛ ولم تُختبر بيانات اعتماد صالحة، فلا يمكن تحديد سبب رفض محاولة مستخدم حقيقية دون بيانات اختبار صالحة. لم توجد staging، لذا لم أجرّب تسجيل دخول أو أي كتابة على الإنتاج.

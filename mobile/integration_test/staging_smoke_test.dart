@@ -37,7 +37,7 @@ void main() {
           await cleanupApi.login(_stagingUsername, _stagingPassword);
         }
         if (profileMayHaveChanged && originalDisplayName != null) {
-          await cleanupApi.updateProfile(originalDisplayName!);
+          await cleanupApi.updateProfile(originalDisplayName);
         }
         if (messageMayExist) {
           final inbox = await cleanupApi.inbox(limit: 50);
