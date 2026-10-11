@@ -13,7 +13,7 @@ Future<void> _settle(WidgetTester tester) => tester.pumpAndSettle(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('production API session connects and the app opens its sign-in screen', (tester) async {
+  testWidgets('production PHP API routes connect and the app opens its sign-in screen', (tester) async {
     expect(ApiConfig.isConfigured, isTrue);
     expect(ApiConfig.apiBaseUrl, 'https://sarehny.com/api/v1/');
 
@@ -23,10 +23,26 @@ void main() {
     expect((session['csrf'] as String).isNotEmpty, isTrue);
     expect(session['user'], isNull);
 
+    await expectLater(
+      api.account(),
+      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 401)),
+    );
+    await expectLater(
+      api.inbox(),
+      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 401)),
+    );
+    await expectLater(
+      api.publicProfile('!'),
+      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),
+    );
+
     app.main();
     await _settle(tester);
 
     expect(find.text('أهلًا بعودتك'), findsOneWidget);
     expect(find.textContaining('الاتصال بالخادم غير مهيأ'), findsNothing);
+
+    final theme = await api.appTheme();
+    expect(theme['theme'], isA<Map<String, dynamic>>());
   });
 }

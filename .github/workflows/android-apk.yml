@@ -143,6 +143,7 @@ jobs:
           fi
 
       - name: Upload debug APK artifact
+        id: upload-apk
         uses: actions/upload-artifact@v4
         with:
           name: sarehny-android-debug-${{ github.run_number }}
@@ -150,9 +151,88 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Verify live production PHP API routes (read-only)
+        id: production-api-contract
+        env:
+          API_BASE_URL: https://sarehny.com/api/v1/
+        run: |
+          python - <<'PY'
+          import http.cookiejar
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from urllib.parse import urlparse
+
+          base = os.environ['API_BASE_URL'].rstrip('/') + '/'
+          origin = f"{urlparse(base).scheme}://{urlparse(base).netloc}"
+          cookies = http.cookiejar.CookieJar()
+          client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
+          failures = []
+          warnings = []
+
+          def request(label, route=None, expected=None, fields=None, query=None, url=None):
+              target = url or base + 'index.php?' + urllib.parse.urlencode({'r': route, **(query or {})})
+              data = urllib.parse.urlencode(fields).encode() if fields is not None else None
+              headers = {'Accept': 'application/json', 'Cache-Control': 'no-cache', 'User-Agent': 'SarehnyAndroidRouteCheck/1.0'}
+              req = urllib.request.Request(target, data=data, headers=headers)
+              try:
+                  with client.open(req, timeout=20) as response:
+                      status, content_type, body = response.status, response.headers.get('Content-Type', ''), response.read(2000).decode('utf-8', 'replace')
+              except urllib.error.HTTPError as error:
+                  status, content_type, body = error.code, error.headers.get('Content-Type', ''), error.read(2000).decode('utf-8', 'replace')
+              try:
+                  payload = json.loads(body) if 'json' in content_type.lower() else None
+              except json.JSONDecodeError:
+                  payload = None
+              passed = status == expected if expected is not None else status == 200
+              result = 'WARNING' if expected is None and not passed else ('PASS' if passed else 'FAIL')
+              print(f'{result} {label}: HTTP {status}; {body[:240]}')
+              if expected is not None and not passed:
+                  failures.append(f'{label}: expected HTTP {expected}, received {status}')
+              return status, payload, content_type
+
+          home_status, _, home_type = request('website homepage', expected=200, url=origin + '/')
+          if 'html' not in home_type.lower(): failures.append('website homepage did not return HTML')
+
+          session_status, session, _ = request('GET index.php?r=session', 'session', 200)
+          csrf = session.get('csrf') if isinstance(session, dict) else None
+          if not isinstance(session, dict) or session.get('ok') is not True or not isinstance(csrf, str) or not csrf:
+              failures.append('session response is missing a valid CSRF token')
+
+          request('GET index.php?r=app-theme', 'app-theme', 200)
+          request('GET index.php?r=account (unauthenticated)', 'account', 401)
+          request('GET index.php?r=inbox (unauthenticated)', 'inbox', 401)
+          request('GET index.php?r=public-profile with invalid input', 'public-profile', 422, query={'username': '!'})
+
+          if isinstance(csrf, str) and csrf:
+              request('POST index.php?r=auth/login with empty test fields (no account lookup)', 'auth/login', 422, fields={'csrf': csrf, 'identifier': '', 'password': ''})
+          else:
+              failures.append('login route was not tested because the session CSRF token is unavailable')
+
+          rewrite_status, _, rewrite_type = request('optional /session rewrite alias', expected=None, url=base + 'session')
+          if rewrite_status != 200:
+              warnings.append('The optional /api/v1/session rewrite alias is unavailable; Flutter uses index.php?r=session and does not depend on mod_rewrite.')
+          for warning in warnings: print('WARNING ' + warning)
+          if failures:
+              raise SystemExit('Production API route contract failed: ' + '; '.join(failures))
+          print('Production PHP API read-only route checks passed.')
+          PY
+
+      - name: Reclaim runner space before Android emulator
+        if: always() && steps.upload-apk.outcome == 'success'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/powershell /usr/local/share/chromium
+          sudo apt-get clean
+          df -h /
+
       - name: Verify Android connection to the production PHP API
+        id: android-production-smoke
+        if: always() && steps.upload-apk.outcome == 'success'
         uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 10
+        timeout-minutes: 15
         with:
           api-level: 35
           arch: x86_64
@@ -162,23 +242,25 @@ jobs:
             cd mobile
             flutter test integration_test/production_connection_test.dart
 
-      - name: Summarize APK configuration
-        if: success()
+      - name: Summarize APK and production API checks
+        if: always()
         env:
           API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
           RUN_STAGING_INTEGRATION: ${{ inputs.run_staging_integration || false }}
+          BUILD_OUTCOME: ${{ steps.upload-apk.outcome }}
+          API_OUTCOME: ${{ steps.production-api-contract.outcome }}
+          ANDROID_OUTCOME: ${{ steps.android-production-smoke.outcome }}
         run: |
           {
-            echo '## Android debug APK build complete'
+            echo '## Android debug APK and live API verification'
             echo ''
-            echo 'Download the `sarehny-android-debug-${{ github.run_number }}` artifact from this workflow run.'
-            echo 'Flutter analysis, unit/widget tests, the Android production session connection test, and the debug APK build completed successfully.'
+            echo 'Artifact upload: **'"$BUILD_OUTCOME"'** (`sarehny-android-debug-${{ github.run_number }}`).'
+            echo 'Production PHP API route checks: **'"$API_OUTCOME"'**.'
+            echo 'Android emulator connection test: **'"$ANDROID_OUTCOME"'**.'
             if [ "$RUN_STAGING_INTEGRATION" = "true" ]; then
-              echo 'The Android emulator staging integration test also completed successfully against the explicitly supplied staging URL.'
-            elif [ -n "$API_BASE_URL" ]; then
-              echo 'This APK is configured for the explicitly supplied staging URL; the production connection smoke test also passed.'
+              echo 'The isolated staging-account end-to-end test was requested.'
             else
-              echo 'No staging URL was supplied; this APK uses the production API built into ApiConfig. The Android production session connection test passed.'
+              echo 'No login credentials or production data mutations were used by the read-only production smoke tests.'
             fi
-            echo 'The artifact is a debug APK, not a signed release build.'
+            echo 'The artifact is a debug APK, not a signed release build. An APK build alone does not establish that missing production PHP routes have been deployed.'
           } >> "$GITHUB_STEP_SUMMARY"
