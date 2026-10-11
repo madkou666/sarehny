@@ -128,8 +128,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            cd mobile
-            flutter test integration_test/staging_smoke_test.dart --dart-define="API_BASE_URL=$API_BASE_URL" --dart-define="STAGING_USERNAME=$STAGING_USERNAME" --dart-define="STAGING_PASSWORD=$STAGING_PASSWORD"
+            cd mobile && flutter test integration_test/staging_smoke_test.dart --dart-define="API_BASE_URL=$API_BASE_URL" --dart-define="STAGING_USERNAME=$STAGING_USERNAME" --dart-define="STAGING_PASSWORD=$STAGING_PASSWORD"
 
       - name: Build connected debug APK for production or staging
         working-directory: mobile
@@ -239,8 +238,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            cd mobile
-            flutter test integration_test/production_connection_test.dart
+            cd mobile && flutter test integration_test/production_connection_test.dart
 
       - name: Summarize APK and production API checks
         if: always()
