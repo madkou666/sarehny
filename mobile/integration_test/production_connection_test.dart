@@ -13,7 +13,7 @@ Future<void> _settle(WidgetTester tester) => tester.pumpAndSettle(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('production PHP API routes connect and the app opens its sign-in screen', (tester) async {
+  testWidgets('production API routes return their expected CSRF and auth contracts', (tester) async {
     expect(ApiConfig.isConfigured, isTrue);
     expect(ApiConfig.apiBaseUrl, 'https://sarehny.com/api/v1/');
 
@@ -39,18 +39,16 @@ void main() {
       api.publicProfile('!'),
       throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),
     );
+    final theme = await api.appTheme();
+    expect(theme['theme'], isA<Map<String, dynamic>>());
+  });
 
+  testWidgets('the APK opens its sign-in screen with the production API configured', (tester) async {
+    expect(ApiConfig.isConfigured, isTrue);
     app.main();
     await _settle(tester);
 
     expect(find.text('أهلًا بعودتك'), findsOneWidget);
     expect(find.textContaining('الاتصال بالخادم غير مهيأ'), findsNothing);
-
-    try {
-      final theme = await api.appTheme();
-      expect(theme['theme'], isA<Map<String, dynamic>>());
-    } on ApiException catch (error) {
-      expect(error.statusCode, 404);
-    }
   });
 }

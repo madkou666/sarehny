@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api_client.dart';
 import '../app_theme.dart';
 import '../models.dart';
+import '../site_browser.dart';
 import '../widgets/message_card.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -35,6 +37,16 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
 
   void _maybeLoadMore() {
     if (_scroll.hasClients && _scroll.position.pixels > _scroll.position.maxScrollExtent - 240 && !_loading && !_loadingMore && _hasMore) _loadMore();
+  }
+
+  Future<void> _openOriginalInbox() async {
+    try {
+      await SiteBrowser.open(widget.api, SitePagePaths.dashboard);
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر فتح صندوق الموقع.')));
+    } on ApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _load({bool refresh = false}) async {
@@ -123,7 +135,10 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
     final theme = Theme.of(context);
     final palette = theme.extension<SarehnyPalette>()!;
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
-      appBar: AppBar(title: const Text('صندوق الرسائل'), actions: [IconButton(tooltip: 'تحديث الرسائل', onPressed: () => _load(refresh: true), icon: const Icon(Icons.refresh_rounded))]),
+      appBar: AppBar(title: const Text('صندوق الرسائل'), actions: [
+        IconButton(tooltip: 'فتح صندوق الموقع الأصلي', onPressed: _openOriginalInbox, icon: const Icon(Icons.open_in_browser_rounded)),
+        IconButton(tooltip: 'تحديث الرسائل', onPressed: () => _load(refresh: true), icon: const Icon(Icons.refresh_rounded)),
+      ]),
       body: RefreshIndicator(onRefresh: () => _load(refresh: true), child: CustomScrollView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), slivers: [
         SliverPadding(padding: const EdgeInsets.fromLTRB(18, 4, 18, 18), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(
@@ -188,7 +203,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
         else SliverPadding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 28), sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
           if (index == _messages.length) return _loadingMore ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())) : const SizedBox(height: 16);
           final message = _messages[index];
-          return Padding(padding: const EdgeInsets.only(bottom: 12), child: MessageCard(key: ValueKey(message.id), message: message, onAction: (action, fields) => _action(message, action, fields)));
+          return Padding(padding: const EdgeInsets.only(bottom: 12), child: MessageCard(key: ValueKey(message.id), message: message, onAction: (action, fields) => _action(message, action, fields), onOpenOriginalInbox: message.isVoice ? _openOriginalInbox : null));
         }, childCount: _messages.length + (_hasMore || _loadingMore ? 1 : 0))))
       ])),
     ));

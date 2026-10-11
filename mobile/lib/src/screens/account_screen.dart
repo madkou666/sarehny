@@ -220,15 +220,17 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Future<void> _openAdmin() async {
+  Future<void> _openSitePage(String path) async {
     try {
-      await SiteBrowser.open(widget.api, 'admin.php');
+      await SiteBrowser.open(widget.api, path);
     } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر فتح لوحة الإدارة داخل التطبيق.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر فتح صفحة الموقع داخل التطبيق.')));
     } on ApiException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
+
+  Future<void> _openAdmin() => _openSitePage(SitePagePaths.admin);
 
   Future<void> _selectAvatar() async {
     if (_updating) return;
@@ -366,6 +368,8 @@ class _AccountScreenState extends State<AccountScreen> {
           ListTile(leading: Icon(Icons.admin_panel_settings_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('لوحة الإدارة'), subtitle: const Text('تُفتح داخل التطبيق مع التحقق من صلاحية الموقع'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _openAdmin),
         ],
       ])),
+      const SizedBox(height: 16),
+      Card(child: ListTile(leading: Icon(Icons.tune_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('إعدادات الاستقبال والخصوصية'), subtitle: const Text('إدارة ميزات الحساب من صفحة الموقع الأصلية'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _updating ? null : () => _openSitePage(SitePagePaths.account))),
       const SizedBox(height: 16),
       Card(child: ListTile(leading: Icon(Icons.auto_awesome_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('تحليل الشخصية'), subtitle: const Text('وفق ميزات وحصص الموقع الحالية'), trailing: _analyzing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.chevron_left_rounded), onTap: _analyzing ? null : _analyze)),
       const SizedBox(height: 16),

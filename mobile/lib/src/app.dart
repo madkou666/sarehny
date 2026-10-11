@@ -171,6 +171,8 @@ class _HomeShellState extends State<_HomeShell> {
               displayName: widget.user.displayName,
               username: widget.user.username,
               isAdmin: widget.user.isAdmin,
+              onOpenInbox: () => setState(() => _index = 1),
+              onSendMessage: () => setState(() => _index = 2),
             ),
             InboxScreen(api: widget.api),
             PublicMessageScreen(api: widget.api),
@@ -185,7 +187,7 @@ class _HomeShellState extends State<_HomeShell> {
             selectedIndex: _index,
             onDestinationSelected: (index) => setState(() => _index = index),
             destinations: const [
-              NavigationDestination(icon: Icon(Icons.apps_outlined), selectedIcon: Icon(Icons.apps_rounded), label: 'الموقع'),
+              NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
               NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox_rounded), label: 'الرسائل'),
               NavigationDestination(icon: Icon(Icons.send_outlined), selectedIcon: Icon(Icons.send_rounded), label: 'إرسال'),
               NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'حسابي'),

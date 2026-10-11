@@ -60,6 +60,15 @@ class ApiClient {
     return siteOrigin.resolve(path).replace(queryParameters: queryParameters);
   }
 
+  Uri routeUri(String route, {Map<String, dynamic>? query}) {
+    if (baseUrl.isEmpty || !RegExp(r'^[a-zA-Z0-9_/-]+$').hasMatch(route)) {
+      throw const ApiException('مسار API غير صالح أو أن عنوان API غير مهيأ.');
+    }
+    return Uri.parse(baseUrl).resolve('index.php').replace(
+      queryParameters: {'r': route, ...?query},
+    );
+  }
+
   final FlutterSecureStorage _storage;
   late final Dio _dio;
   String? _csrf;
@@ -222,9 +231,8 @@ class ApiClient {
       throw const ApiException('الاتصال بالخادم غير مهيأ. لم يتم إرسال أي طلب API.');
     }
     try {
-      final response = await _dio.request<dynamic>(
-        'index.php',
-        queryParameters: {'r': path, ...?query},
+      final response = await _dio.requestUri<dynamic>(
+        routeUri(path, query: query),
         data: formData ?? (fields == null ? null : FormData.fromMap(fields)),
         options: Options(method: method),
       );
