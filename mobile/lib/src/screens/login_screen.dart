@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../api_client.dart';
@@ -70,6 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) return 'أدخل كلمة المرور.';
+    if (utf8.encode(value).length > 1024) {
+      return 'كلمة المرور تتجاوز الحد المسموح به.';
+    }
     if (_registering && value.length < 8) return 'كلمة المرور يجب ألا تقل عن ٨ أحرف.';
     return null;
   }
@@ -183,9 +188,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelText: 'البريد الإلكتروني أو اسم المستخدم',
                               prefixIcon: Icon(Icons.alternate_email_rounded),
                             ),
-                            validator: (value) => value == null || value.trim().isEmpty
-                                ? 'أدخل بريدك أو اسم المستخدم.'
-                                : null,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'أدخل بريدك أو اسم المستخدم.';
+                              }
+                              if (utf8.encode(value.trim()).length > 190) {
+                                return 'البريد أو اسم المستخدم يتجاوز الحد المسموح به.';
+                              }
+                              return null;
+                            },
                           ),
                         const SizedBox(height: 14),
                         TextFormField(
