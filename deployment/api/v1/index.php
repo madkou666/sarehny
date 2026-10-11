@@ -100,7 +100,7 @@ if ($route === '/') $route = '/session';
 try {
   if ($method === 'POST') api_require_csrf();
 
-  if ($method === 'GET' && $route === '/app-theme') {
+  if ($method === 'GET' && in_array($route, ['/app-theme', '/theme-public'], true)) {
     api_ok(['theme' => api_public_theme()]);
   }
 

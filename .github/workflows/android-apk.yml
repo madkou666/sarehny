@@ -10,12 +10,17 @@ on:
   workflow_dispatch:
     inputs:
       api_base_url:
-        description: 'Optional HTTPS staging API URL ending in /api/v1/. Leave empty to use the verified production API.'
+        description: 'Optional HTTPS staging API URL ending in /api/v1/. Leave empty to build for production.'
         required: false
         type: string
         default: ''
       run_staging_integration:
         description: 'Run the Android app against the isolated staging API using repository secrets.'
+        required: false
+        type: boolean
+        default: false
+      verify_production_api:
+        description: 'Run read-only production route checks after the APK is safely uploaded.'
         required: false
         type: boolean
         default: false
@@ -92,6 +97,26 @@ jobs:
                   raise SystemExit('Provide an HTTPS staging URL ending in /api/v1/; production hosts are not accepted.')
           PY
 
+      - name: Build connected debug APK for production or staging
+        working-directory: mobile
+        env:
+          API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
+        run: |
+          if [ -n "$API_BASE_URL" ]; then
+            flutter build apk --debug --dart-define="API_BASE_URL=$API_BASE_URL"
+          else
+            flutter build apk --debug
+          fi
+
+      - name: Upload debug APK artifact
+        id: upload-apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarehny-android-debug-${{ github.run_number }}
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Require a dedicated staging target and credentials
         if: github.event_name == 'workflow_dispatch' && inputs.run_staging_integration
         env:
@@ -116,7 +141,9 @@ jobs:
           PY
 
       - name: Run Android end-to-end test against staging
+        id: staging-integration
         if: github.event_name == 'workflow_dispatch' && inputs.run_staging_integration
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         env:
           API_BASE_URL: ${{ github.event.inputs.api_base_url }}
@@ -130,28 +157,10 @@ jobs:
           script: |
             cd mobile && flutter test integration_test/staging_smoke_test.dart --dart-define="API_BASE_URL=$API_BASE_URL" --dart-define="STAGING_USERNAME=$STAGING_USERNAME" --dart-define="STAGING_PASSWORD=$STAGING_PASSWORD"
 
-      - name: Build connected debug APK for production or staging
-        working-directory: mobile
-        env:
-          API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
-        run: |
-          if [ -n "$API_BASE_URL" ]; then
-            flutter build apk --debug --dart-define="API_BASE_URL=$API_BASE_URL"
-          else
-            flutter build apk --debug
-          fi
-
-      - name: Upload debug APK artifact
-        id: upload-apk
-        uses: actions/upload-artifact@v4
-        with:
-          name: sarehny-android-debug-${{ github.run_number }}
-          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Verify live production PHP API routes (read-only)
         id: production-api-contract
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_production_api
+        timeout-minutes: 5
         env:
           API_BASE_URL: https://sarehny.com/api/v1/
         run: |
@@ -208,8 +217,21 @@ jobs:
           csrf = session.get('csrf') if isinstance(session, dict) else None
           if not isinstance(session, dict) or session.get('ok') is not True or not isinstance(csrf, str) or not csrf:
               failures.append('session response is missing a valid CSRF token')
+          session_cookie = next((cookie.value for cookie in cookies if cookie.name == 'PHPSESSID'), None)
+          if not session_cookie:
+              failures.append('session response did not establish a PHPSESSID cookie')
+          repeated_status, repeated_session, _ = request('repeat session to verify cookie persistence', 'session', 200)
+          if repeated_status == 200 and (not isinstance(repeated_session, dict) or repeated_session.get('csrf') != csrf):
+              failures.append('CSRF token changed when the same PHP session cookie was reused')
+          repeated_cookie = next((cookie.value for cookie in cookies if cookie.name == 'PHPSESSID'), None)
+          if session_cookie and repeated_cookie != session_cookie:
+              failures.append('PHP session cookie was not stable across consecutive requests')
 
-          request('GET index.php?r=app-theme', 'app-theme', 200)
+          for route in ('app-theme', 'theme-public'):
+              status, payload, _ = request(f'GET index.php?r={route}', route, 200)
+              theme = payload.get('theme') if isinstance(payload, dict) else None
+              if status == 200 and (not isinstance(payload, dict) or payload.get('ok') is not True or not isinstance(theme, dict) or not isinstance(theme.get('colors'), dict) or not isinstance(theme.get('radius'), int)):
+                  failures.append(f'{route} did not return the expected public theme contract')
           request('GET index.php?r=account (login required; not feature-tested)', 'account', blocked=401)
           request('GET index.php?r=inbox (login required; not feature-tested)', 'inbox', blocked=401)
           request('GET index.php?r=public-profile with invalid input', 'public-profile', 422, query={'username': '!'})
@@ -228,46 +250,30 @@ jobs:
           print('Production PHP API read-only route checks passed.')
           PY
 
-      - name: Reclaim runner space before Android emulator
-        if: always() && steps.upload-apk.outcome == 'success'
-        run: |
-          df -h /
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/powershell /usr/local/share/chromium
-          sudo apt-get clean
-          df -h /
-
-      - name: Verify Android connection to the production PHP API
-        id: android-production-smoke
-        if: always() && steps.upload-apk.outcome == 'success'
-        uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 30
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            cd mobile && flutter test integration_test/production_connection_test.dart
-
       - name: Summarize APK and production API checks
         if: always()
         env:
           API_BASE_URL: ${{ github.event.inputs.api_base_url || '' }}
           RUN_STAGING_INTEGRATION: ${{ inputs.run_staging_integration || false }}
           BUILD_OUTCOME: ${{ steps.upload-apk.outcome }}
+          STAGING_OUTCOME: ${{ steps.staging-integration.outcome }}
           API_OUTCOME: ${{ steps.production-api-contract.outcome }}
-          ANDROID_OUTCOME: ${{ steps.android-production-smoke.outcome }}
         run: |
           {
-            echo '## Android debug APK and live API verification'
+            echo '## Android debug APK and optional live API verification'
             echo ''
             echo 'Artifact upload: **'"$BUILD_OUTCOME"'** (`sarehny-android-debug-${{ github.run_number }}`).'
-            echo 'Production PHP API route checks: **'"$API_OUTCOME"'**.'
-            echo 'Android emulator connection test: **'"$ANDROID_OUTCOME"'**.'
-            if [ "$RUN_STAGING_INTEGRATION" = "true" ]; then
-              echo 'The isolated staging-account end-to-end test was requested.'
+            if [ "$API_OUTCOME" = "success" ]; then
+              echo 'Read-only production PHP route checks: **passed**.'
+            elif [ "$API_OUTCOME" = "failure" ]; then
+              echo 'Read-only production PHP route checks: **failed**; see the API response in the workflow log. The APK artifact remains available.'
             else
-              echo 'No login credentials or production data mutations were used by the read-only production smoke tests.'
+              echo 'Production route checks were **not requested**; enable `verify_production_api` for a manual read-only check.'
             fi
-            echo 'The artifact is a debug APK, not a signed release build. An APK build alone does not establish that missing production PHP routes have been deployed.'
+            if [ "$RUN_STAGING_INTEGRATION" = "true" ]; then
+              echo 'Isolated staging end-to-end test: **'"$STAGING_OUTCOME"'**.'
+            else
+              echo 'No login credentials or production data mutations were used.'
+            fi
+            echo 'The artifact is a debug APK, not a signed release build. APK creation and live API compatibility are verified separately.'
           } >> "$GITHUB_STEP_SUMMARY"

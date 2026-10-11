@@ -23,6 +23,7 @@ class ApiClient {
       connectTimeout: const Duration(seconds: 12),
       sendTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 20),
+      followRedirects: false,
       headers: {'Accept': 'application/json'},
       validateStatus: (status) => status != null,
     ));
@@ -46,6 +47,15 @@ class ApiClient {
   static String _normalizeBaseUrl(String value) {
     final normalized = value.trim();
     if (normalized.isEmpty) return '';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw const ApiException('يجب أن يكون عنوان API رابط HTTPS صالحًا وآمنًا.');
+    }
     return normalized.endsWith('/') ? normalized : '$normalized/';
   }
 

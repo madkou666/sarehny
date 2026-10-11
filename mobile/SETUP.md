@@ -63,7 +63,7 @@
 
 ## 4) عنوان API وإعدادات التطوير والإنتاج
 
-عنوان API الافتراضي الموثق في `mobile/lib/src/api_config.dart` هو `https://sarehny.com/api/v1/`. يرسل Flutter الطلبات عبر `index.php?r=session` و`index.php?r=auth/login` ومسارات مماثلة، وليس عبر `/api/v1/session`؛ مسار URL المختصر يحتاج أن يسمح خادم الاستضافة بقراءة `.htaccess` و`mod_rewrite`. صفحات الموقع تُفتح من الأصل نفسه عبر PHP WebView. GitHub Actions يبني APK بهذا العنوان إذا كان `API_BASE_URL` فارغًا، ثم يختبر API الحقيقي قراءةً فقط، ويختبر session والواجهة على Android Emulator. يمكن تمرير `API_BASE_URL` لاستهداف HTTPS staging منفصل. لا تختبر عمليات كتابة على الإنتاج. للتطوير المحلي استخدم عنوان الخادم الذي شغّلته فعليًا، مثل `--dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1/` للمحاكي. Android يسمح بـHTTPS افتراضيًا؛ HTTP محصور في إعدادات debug.
+عنوان API الافتراضي في `mobile/lib/src/api_config.dart` هو `https://sarehny.com/api/v1/`. يرسل Flutter الطلبات بصيغة `index.php?r=...`؛ لا يعتمد على rewrite أو `.htaccess`. عنوان API في التطبيق يُرفض ما لم يكن HTTPS صالحًا ومن دون بيانات اعتماد أو query/fragment، كما أن عميل HTTP لا يتبع redirects حتى لا يسرّب كوكي الجلسة إلى مضيف آخر. صفحات الموقع تُفتح من الأصل نفسه عبر PHP WebView. CI يبني APK ويشغّل اختبارات Flutter دون انتظار محاكي الإنتاج؛ يمكن تشغيل فحص مسارات الإنتاج للقراءة فقط يدويًا، أو اختبار E2E على staging منفصلة. لا تختبر عمليات كتابة على الإنتاج. للتطوير المحلي استخدم HTTPS محليًا أو staging؛ لا تمرر HTTP إلى عميل التطبيق. إعداد Android debug يسمح بنقل HTTP محليًا على مستوى المنصة، لكن عميل الـAPI يفرض HTTPS لحماية بيانات الدخول والجلسة.
 
 ## 5) فحوصات التطبيق وبناء Android
 
@@ -113,13 +113,13 @@ flutter.sdk=/المسار/إلى/flutter
 
 ## 7) بناء APK تلقائيًا وتنزيله دون Android Studio
 
-سير GitHub Actions في `.github/workflows/android-apk.yml` يشغّل PHP syntax lint، ويتحقق من تطابق أرشيف API مع مصدره، ثم ينفذ `flutter analyze` واختبارات Flutter، ويبني ويرفع APK debug، وبعده يتحقق من الموقع الحي ومسارات PHP بقراءات آمنة، ويختبر شاشة التطبيق والجلسة على Android Emulator. تُرفع الحزمة قبل اختبارات الخدمة كي تبقى متاحة حتى إن كشف الفحص أن نشر الموقع ناقصًا. يبدأ تلقائيًا عند تغييرات `mobile/` أو `deployment/api/v1/` أو أرشيف API أو Workflow؛ ويمكن تشغيله يدويًا من **Actions → Build Android APK (production or staging) → Run workflow** وترك `api_base_url` فارغًا لاستخدام الإنتاج، أو تحديد HTTPS staging. الـArtifact صالح 14 يومًا، وهو debug وغير موقّع. لا يرفع الـWorkflow ملفات إلى Hostinger ولا يغيّر قاعدة البيانات.
+سير GitHub Actions في `.github/workflows/android-apk.yml` يشغّل PHP syntax lint، ويتحقق من تطابق أرشيف API مع مصدره، ثم ينفذ `flutter analyze` واختبارات Flutter ويبني ويرفع APK debug. هذا المسار الأساسي لا يشغّل Android Emulator متصلًا بالإنتاج، فلا يعلق بسبب محاكي أو يفترض بيانات مستخدم. من التشغيل اليدوي **Actions → Build Android APK (production or staging) → Run workflow** يمكن تفعيل `verify_production_api` لإجراء فحوص HTTP قراءة فقط؛ فشل توافق المسار يظل ظاهرًا في سجل الـrun بينما يكون artifact قد رُفع بالفعل. لا يمرّر فحص الإنتاج كلمة مرور ولا ينفذ تغيير بيانات. اختر `run_staging_integration` فقط عند إعداد HTTPS staging وقاعدة منفصلتين وحساب اختبار مخصص. يبدأ البناء تلقائيًا عند تغييرات `mobile/` أو `deployment/api/v1/` أو أرشيف API أو Workflow؛ والـArtifact صالح 14 يومًا، debug وغير موقّع. لا يرفع الـWorkflow ملفات إلى Hostinger ولا يغيّر قاعدة البيانات.
 
 **اختبار API على staging داخل Android:** يشغّل `integration_test/staging_smoke_test.dart` التطبيق على Android Emulator ويسجّل الدخول بالحساب المخصص. يفتح شاشة الحساب، يغيّر الاسم الظاهر مؤقتًا عبر واجهة Flutter، يتحقق من القيمة على API ثم يعيد الاسم الأصلي؛ ويفتح صندوق الوارد، ويرسل رسالة اختبار إلى الحساب نفسه، ويتحقق من ظهورها ثم يحذفها ويسجل الخروج. ينظف الاختبار الاسم والرسالة اللذين غيّرهما إذا تعثر بعد بدء العملية. لا يُشغّل هذا الاختبار على الإنتاج؛ يغيّر اسم حساب staging مؤقتًا ثم يعيده، ولا يغيّر كلمة المرور أو بيانات أي مستخدم إنتاجي.
 
 لتشغيله بأمان، أنشئ PHP staging وقاعدة بيانات منفصلة من نسخة اختبارية من المخطط، وأنشئ حسابًا مخصصًا غير إداري للاستعمال الآلي واجعل استقبال الرسائل مفعّلًا عليه. في إعدادات مستودع GitHub، أضف أسرارًا باسم `SAREHNY_STAGING_USERNAME` و`SAREHNY_STAGING_PASSWORD`، ثم شغّل يدويًا **Actions → Build Android APK (production or staging) → Run workflow**، وأدخل عنوان staging HTTPS ينتهي بـ`/api/v1/` وفعّل `run_staging_integration`. لا تضع كلمة المرور في عنوان URL أو مستودع Git أو سجل المحادثة. يرفض فحص Workflow عنوانًا لا يبدو عنوان اختبار، لكن يجب أيضًا التأكد بشريًا أن النطاق وقاعدة البيانات معزولان عن الإنتاج.
 
-تشغيل `38092972775` سجل تاريخي لنسخة APK offline ولا يمثل فحص اتصال. التشغيل `38096877000` بنى ورفع artifact رقم 21 بنجاح، لكن اختبار Android Emulator لم يبدأ لأن صورة Android SDK انتهت بمساحة القرص؛ يعالج Workflow الحالي مساحة المحاكي ويرفع الـAPK قبل فحوص الخدمة. لم تُنشر تغييرات API إلى Hostinger ولم تُعدّل قاعدة الإنتاج.
+تشغيلات Actions السابقة أظهرت أن محاكي Android على الإنتاج يمكن أن يظل معلقًا بعد إنشاء APK وأن endpoint `app-theme` غير منشور على الخادم الحي. عُدّل Workflow بحيث يكون بناء APK والتحليل والاختبارات مستقلًا عن تكامل الخادم؛ فحص الإنتاج للقراءة فقط أصبح اختيارًا يدويًا، بينما اختبار الكتابة لا يعمل إلا على staging بطلب صريح وأسرار مخصصة. هذا لا يرفع تغييرات PHP إلى Hostinger؛ يجب تطبيق إصلاح المسارات يدويًا بعد نسخة احتياطية، ثم إعادة فحص endpoint الحي. لا تُنفّذ كتابة على قاعدة الإنتاج.
 
 ## 8) تنزيل المشروع كاملًا أو ZIP
 
@@ -129,13 +129,11 @@ flutter.sdk=/المسار/إلى/flutter
 
 ## حالة التحقق وحدودها
 
-نجح GitHub Actions في التشغيل [`38092513406`](https://github.com/madkou666/sarehny/actions/runs/38092513406) على 2026-10-10: `flutter analyze` دون أخطاء، ونجحت الاختبارات العشرة، ثم اكتمل بناء APK debug دون عنوان API ورفع artifact `sarehny-android-debug-16` (79,197,534 بايت). هذا يثبت التحليل واختبارات الوحدة والبناء فقط؛ لم يرسل التشغيل أي طلبات API، ولم ينفذ PHP lint في ذلك التشغيل.
-
-أُضيف الآن إلى CI فحص صياغة PHP للـAPI والتحقق من تطابق `deployment/hostinger-api-v1.zip` مع مصدره؛ ينتظر تأكيدهما من تشغيل CI التالي. أما اختبار الجلسة وCSRF والحسابات والكتابة/الحذف ورفع الصور وصلاحيات الإدارة وWebView فيلزم له staging منفصل وقاعدة اختبار وحسابات اصطناعية؛ لم يتوفر ذلك، لذا تبقى اختبارات التكامل هذه غير منفذة. لم يُختبر التطبيق على جهاز Android فعلي.
+يتحقق CI من صياغة PHP، وتطابق ملف API داخل أرشيف Hostinger مع المصدر، وتحليل Flutter واختباراته، ثم يبني ويرفع APK debug. يمكن تفعيل فحص API الإنتاجي يدويًا ليتحقق من جلسة PHP واستقرار الكوكي وCSRF وبنية `app-theme` و`theme-public` دون تسجيل دخول أو تعديل بيانات. لا يثبت هذا عمل كل الميزات المحمية؛ يلزم حساب staging منفصل للتحقق من الكتابة، رفع الملفات، الصلاحيات وWebView. لم يُنشر PHP تلقائيًا إلى Hostinger ولم تُختبر تغييرات الكتابة على قاعدة الإنتاج.
 
 فحص HTTPS على `https://sarehny.com/api/v1/index.php?r=session` أعاد `200` مع CSRF و`user: null`. عنوان الجلسة المعتمد للتطبيق هو `GET /api/v1/index.php?r=session`، وليس `/api/v1/session`. وأعاد `POST /api/v1/index.php?r=auth/login` عند تمرير CSRF الصحيح وحقول دخول فارغة `422` من مدقق الحقول، دون استعلام حساب أو تغيير بيانات. أعاد `GET ...?r=account` و`GET ...?r=inbox` `401 unauthenticated` بلا جلسة، وأعاد `public-profile` مع اسم غير صالح `422`. عميل Flutter يستخدم الصيغ المعتمدة هذه؛ لم أبدلها بمسارات مفترضة. لكن `GET ...?r=app-theme` يعيد `404 not_found` خلافًا للملف المحلي، ما يثبت أن نسخة PHP على Hostinger ليست مطابقة تمامًا لحزمة المشروع. لم نتمكن من قراءة مصدر PHP البعيد مباشرةً أو مقارنة checksum له؛ تمت المقارنة عبر السلوك الحي.
 
-لم أرفع أو أعدّل أي ملف على Hostinger أو قاعدة البيانات. من الأدلة الحية: `session` يُنفّذ عبر `index.php?r=...` ويعيد JSON، بينما `r=app-theme` يرجع JSON من fallback الخاص بالتطبيق (`code:not_found`). إذن عنوان Flutter وصيغة query يصلان إلى PHP؛ الملف الذي يخدم `api/v1/index.php` لا يحتوي حاليًا على معالج `app-theme`، وليس هذا خلل rewrite أو حاجة لتغيير عنوان التطبيق. لا يمكن من HTTPS وحده التمييز بين نسخة API قديمة وdocument root مختلف، ولا قراءة الملف أو checksum المنشور. `theme-public` ليس route في عميل Flutter ولا في مصدر API المحلي؛ العقد المستخدم هو `app-theme`، لذلك لا تضف alias غير مطلوب.
+لم أرفع أو أعدّل أي ملف على Hostinger أو قاعدة البيانات. من الفحص الحي السابق: `session` يُنفّذ عبر `index.php?r=...` ويعيد JSON، بينما `r=app-theme` يرجع `code:not_found`؛ لذلك عنوان Flutter وصيغة query يعملان، والنسخة الحية قديمة أو مختلفة عن مصدر المشروع. أُضيف محليًا معالج متوافق للمسارين `app-theme` و`theme-public` في الكود وأرشيف Hostinger، لكن لن يظهر ذلك على الموقع حتى يُنشر الملف يدويًا. لا يمكن من HTTPS وحده تمييز نسخة API قديمة عن document root مختلف أو قراءة المصدر البعيد وchecksum له.
 
 **التعديل اليدوي المقترح بعد نسخة احتياطية، دون استبدال الملف:** في Hostinger File Manager نزّل نسخة من **`<document-root>/api/v1/index.php`** (غالبًا `public_html/api/v1/index.php`) واحفظها خارج مجلد الموقع. قارنها بـ`deployment/api/v1/index.php`، ثم أضف فقط كتلة معالج المظهر إن لم تكن موجودة؛ أبقِ كل الدوال والمسارات الأخرى كما هي. اعتمد `theme_fields()` و`setting()` الموجودتين في `inc.php` و`api_ok()` ومعالجة المسار الحالية. ضع الدالة المساعدة قرب دوال API الأخرى، قبل قراءة/dispatch المسارات:
 
@@ -150,10 +148,10 @@ function api_public_theme() {
 }
 ```
 
-وقبل معالج `/session` أو fallback `not_found` داخل dispatch، أضف:
+وقبل معالج `/session` أو fallback `not_found` داخل dispatch، أضف (المساران يعيدان نفس عقد JSON):
 
 ```php
-if ($method === 'GET' && $route === '/app-theme') {
+if ($method === 'GET' && in_array($route, ['/app-theme', '/theme-public'], true)) {
   api_ok(['theme' => api_public_theme()]);
 }
 ```

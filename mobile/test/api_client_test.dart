@@ -17,7 +17,26 @@ void main() {
       api.routeUri('app-theme').toString(),
       'https://stage.sarehny.example/api/v1/index.php?r=app-theme',
     );
+    expect(
+      api.routeUri('theme-public').toString(),
+      'https://stage.sarehny.example/api/v1/index.php?r=theme-public',
+    );
     expect(() => api.routeUri('../session'), throwsA(isA<ApiException>()));
+  });
+
+  test('API base URLs require HTTPS and reject embedded credentials or query data', () {
+    expect(
+      () => ApiClient(baseUrl: 'http://stage.sarehny.example/api/v1/'),
+      throwsA(isA<ApiException>()),
+    );
+    expect(
+      () => ApiClient(baseUrl: 'https://user:password@stage.sarehny.example/api/v1/'),
+      throwsA(isA<ApiException>()),
+    );
+    expect(
+      () => ApiClient(baseUrl: 'https://stage.sarehny.example/api/v1/?r=session'),
+      throwsA(isA<ApiException>()),
+    );
   });
 
   test('site pages resolve to the PHP API origin', () {
