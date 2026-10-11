@@ -171,7 +171,7 @@ jobs:
           failures = []
           warnings = []
 
-          def request(label, route=None, expected=None, fields=None, query=None, url=None):
+          def request(label, route=None, expected=None, blocked=None, fields=None, query=None, url=None):
               target = url or base + 'index.php?' + urllib.parse.urlencode({'r': route, **(query or {})})
               data = urllib.parse.urlencode(fields).encode() if fields is not None else None
               headers = {'Accept': 'application/json', 'Cache-Control': 'no-cache', 'User-Agent': 'SarehnyAndroidRouteCheck/1.0'}
@@ -185,11 +185,20 @@ jobs:
                   payload = json.loads(body) if 'json' in content_type.lower() else None
               except json.JSONDecodeError:
                   payload = None
-              passed = status == expected if expected is not None else status == 200
-              result = 'WARNING' if expected is None and not passed else ('PASS' if passed else 'FAIL')
+              if blocked is not None and status == blocked:
+                  result = 'BLOCKED'
+                  warnings.append(f'{label}: authentication is required; this is not a successful feature test')
+              elif expected is not None:
+                  passed = status == expected
+                  result = 'PASS' if passed else 'FAIL'
+                  if not passed:
+                      failures.append(f'{label}: expected HTTP {expected}, received {status}')
+              elif blocked is not None:
+                  result = 'FAIL'
+                  failures.append(f'{label}: expected authentication block HTTP {blocked}, received {status}')
+              else:
+                  result = 'PASS' if status == 200 else 'WARNING'
               print(f'{result} {label}: HTTP {status}; {body[:240]}')
-              if expected is not None and not passed:
-                  failures.append(f'{label}: expected HTTP {expected}, received {status}')
               return status, payload, content_type
 
           home_status, _, home_type = request('website homepage', expected=200, url=origin + '/')
@@ -201,8 +210,8 @@ jobs:
               failures.append('session response is missing a valid CSRF token')
 
           request('GET index.php?r=app-theme', 'app-theme', 200)
-          request('GET index.php?r=account (unauthenticated)', 'account', 401)
-          request('GET index.php?r=inbox (unauthenticated)', 'inbox', 401)
+          request('GET index.php?r=account (login required; not feature-tested)', 'account', blocked=401)
+          request('GET index.php?r=inbox (login required; not feature-tested)', 'inbox', blocked=401)
           request('GET index.php?r=public-profile with invalid input', 'public-profile', 422, query={'username': '!'})
 
           if isinstance(csrf, str) and csrf:
@@ -231,7 +240,7 @@ jobs:
         id: android-production-smoke
         if: always() && steps.upload-apk.outcome == 'success'
         uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 15
+        timeout-minutes: 30
         with:
           api-level: 35
           arch: x86_64

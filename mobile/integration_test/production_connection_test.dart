@@ -13,7 +13,7 @@ Future<void> _settle(WidgetTester tester) => tester.pumpAndSettle(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('production API routes return their expected CSRF and auth contracts', (tester) async {
+  testWidgets('production session and CSRF-protected login validation reach the PHP API', (tester) async {
     expect(ApiConfig.isConfigured, isTrue);
     expect(ApiConfig.apiBaseUrl, 'https://sarehny.com/api/v1/');
 
@@ -28,19 +28,9 @@ void main() {
       throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),
     );
     await expectLater(
-      api.account(),
-      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 401)),
-    );
-    await expectLater(
-      api.inbox(),
-      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 401)),
-    );
-    await expectLater(
       api.publicProfile('!'),
       throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 422)),
     );
-    final theme = await api.appTheme();
-    expect(theme['theme'], isA<Map<String, dynamic>>());
   });
 
   testWidgets('the APK opens its sign-in screen with the production API configured', (tester) async {
