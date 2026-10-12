@@ -143,9 +143,9 @@ class _NativeSiteScreenState extends State<NativeSiteScreen> {
                     future: _content,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState != ConnectionState.done) {
-                        return const ListView(
-                          physics: AlwaysScrollableScrollPhysics(),
-                          children: [SizedBox(height: 200), Center(child: CircularProgressIndicator())],
+                        return ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [SizedBox(height: 200), Center(child: CircularProgressIndicator())],
                         );
                       }
                       if (snapshot.hasError) {
@@ -353,7 +353,7 @@ class _NativeSiteScreenState extends State<NativeSiteScreen> {
         child: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
-            Text('خلّينا نسمعك.', style: Theme.of(context).textTheme.headlineMedium),
+            Text('خ��ّينا نسمعك.', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text('لديك فكرة أو سؤال أو ملاحظة؟ اكتب لنا وسنقرأ رسالتك.', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 22),

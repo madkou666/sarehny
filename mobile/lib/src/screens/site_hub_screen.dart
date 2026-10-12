@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api_client.dart';
-import '../app_theme.dart';
 import 'native_site_screen.dart';
 
 class SiteHubScreen extends StatefulWidget {
