@@ -29,18 +29,90 @@ class SiteHubScreen extends StatefulWidget {
 
 class _SiteHubScreenState extends State<SiteHubScreen> {
   late Future<Map<String, dynamic>> _overview;
+  late Future<Map<String, dynamic>> _siteHome;
 
   @override
   void initState() {
     super.initState();
     _overview = widget.api.account();
+    _siteHome = widget.api.siteHome();
   }
 
   Future<void> _refresh() async {
-    setState(() => _overview = widget.api.account());
+    setState(() {
+      _overview = widget.api.account();
+      _siteHome = widget.api.siteHome();
+    });
     try {
-      await _overview;
+      await Future.wait([_overview, _siteHome]);
     } catch (_) {}
+  }
+
+  Widget _siteEditorialSection() => FutureBuilder<Map<String, dynamic>>(
+        future: _siteHome,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()));
+          }
+          if (snapshot.hasError) {
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.cloud_off_outlined),
+                title: const Text('تعذّر تحميل محتوى الموقع'),
+                trailing: IconButton(tooltip: 'إعادة المحاولة', onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
+              ),
+            );
+          }
+          final data = snapshot.data ?? const <String, dynamic>{};
+          final title = (data['title'] as String? ?? '').trim();
+          final lead = (data['lead'] as String? ?? '').trim();
+          final posts = (data['posts'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map((post) => Map<String, dynamic>.from(post))
+              .where((post) => post['id'] is num && (post['id'] as num) > 0)
+              .toList();
+          if (title.isEmpty && lead.isEmpty && posts.isEmpty) return const SizedBox.shrink();
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (title.isNotEmpty || lead.isNotEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    if (title.isNotEmpty) Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    if (title.isNotEmpty && lead.isNotEmpty) const SizedBox(height: 6),
+                    if (lead.isNotEmpty) Text(lead, style: Theme.of(context).textTheme.bodyMedium),
+                  ]),
+                ),
+              ),
+            if (posts.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Row(children: [
+                  Expanded(child: Text('أحدث المقالات', style: Theme.of(context).textTheme.titleMedium)),
+                  TextButton(onPressed: () => _openPage(NativeSitePage.blog), child: const Text('كل المقالات')),
+                ]),
+              ),
+              ...posts.map((post) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(post['title'] as String? ?? 'مقال جديد'),
+                      subtitle: (post['excerpt'] as String? ?? '').trim().isEmpty
+                          ? null
+                          : Text(post['excerpt'] as String, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () => _openArticle((post['id'] as num).toInt()),
+                    ),
+                  )),
+            ],
+          ]);
+        },
+      );
+
+  void _openArticle(int id) {
+    if (id < 1) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NativeSiteScreen(api: widget.api, page: NativeSitePage.article, articleId: id),
+    ));
   }
 
   Future<void> _copyProfileLink() async {
@@ -152,6 +224,8 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                   const SizedBox(width: 10),
                   Expanded(child: OutlinedButton.icon(onPressed: widget.onSendMessage, icon: const Icon(Icons.send_outlined), label: const Text('إرسال رسالة'))),
                 ]),
+                const SizedBox(height: 14),
+                _siteEditorialSection(),
                 const SizedBox(height: 14),
                 FutureBuilder<Map<String, dynamic>>(
                   future: _overview,
