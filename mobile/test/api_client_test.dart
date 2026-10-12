@@ -61,6 +61,11 @@ void main() {
 
     expect(api.siteOrigin.origin, 'https://stage.sarehny.example');
     expect(
+      api.voiceMessageUri(42).toString(),
+      'https://stage.sarehny.example/voice.php?id=42',
+    );
+    expect(() => api.voiceMessageUri(0), throwsA(isA<ApiException>()));
+    expect(
       api.publicProfileUri('sara_99').toString(),
       'https://stage.sarehny.example/u.php?n=sara_99',
     );

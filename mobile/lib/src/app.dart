@@ -10,6 +10,7 @@ import 'screens/inbox_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/public_message_screen.dart';
 import 'screens/site_hub_screen.dart';
+import 'native_platform.dart';
 
 class SarehnyApp extends StatefulWidget {
   const SarehnyApp({super.key});
@@ -99,6 +100,7 @@ class _SarehnyAppState extends State<SarehnyApp> with WidgetsBindingObserver {
   void _setUser(AppUser? user) => setState(() => _user = user);
 
   Future<void> _logout() async {
+    await NativeVoicePlayback.stopAll().catchError((_) {});
     try {
       await _api.logout();
     } finally {

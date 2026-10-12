@@ -244,12 +244,12 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
         else if (_messages.isEmpty) SliverFillRemaining(hasScrollBody: false, child: _EmptyState(
           icon: Icons.mark_email_read_outlined,
           title: _query.isNotEmpty ? 'لا توجد نتائج مطابقة' : 'صندوقك هادئ الآن',
-          message: _query.isNotEmpty ? 'جرّب عبارة بحث أخرى أو امسح البحث لعرض رسائلك.' : 'عندما تصلك رسالة مجهولة، ستظهر هنا. شارك رابطك الشخصي ليبدأ أصدقاؤك بالكتابة.',
+          message: _query.isNotEmpty ? 'جرّب عبارة بحث أخرى أو امسح البحث لعرض رسائلك.' : 'عندما تصلك ��سالة مجهولة، ستظهر هنا. شارك رابطك الشخصي ليبدأ أصدقاؤك بالكتابة.',
         ))
         else SliverPadding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 28), sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
           if (index == _messages.length) return _loadingMore ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())) : const SizedBox(height: 16);
           final message = _messages[index];
-          return Padding(padding: const EdgeInsets.only(bottom: 12), child: MessageCard(key: ValueKey(message.id), message: message, onAction: (action, fields) => _action(message, action, fields)));
+          return Padding(padding: const EdgeInsets.only(bottom: 12), child: MessageCard(key: ValueKey(message.id), api: widget.api, message: message, onAction: (action, fields) => _action(message, action, fields)));
         }, childCount: _messages.length + (_hasMore || _loadingMore ? 1 : 0))))
       ])),
     ));

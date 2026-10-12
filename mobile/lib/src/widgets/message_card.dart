@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../api_client.dart';
 import '../app_theme.dart';
 import '../models.dart';
+import 'voice_message_player.dart';
 
 class MessageCard extends StatelessWidget {
-  const MessageCard({super.key, required this.message, required this.onAction});
+  const MessageCard({super.key, required this.api, required this.message, required this.onAction});
+  final ApiClient api;
   final InboxMessage message;
   final Future<void> Function(String action, Map<String, String> fields) onAction;
 
@@ -104,24 +107,7 @@ class MessageCard extends StatelessWidget {
         const Spacer(), Text(_dateLabel(message.createdAt), style: theme.textTheme.bodySmall),
       ]),
       const SizedBox(height: 15),
-      if (message.isVoice) ...[
-        Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(color: theme.extension<SarehnyPalette>()!.canvas, borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            Icon(Icons.graphic_eq_rounded, color: theme.extension<SarehnyPalette>()!.primary),
-            const SizedBox(width: 8),
-            Expanded(child: Text('رسالة صوتية${message.audioSeconds == null ? '' : ' · ${message.audioSeconds} ثانية'}', style: theme.textTheme.bodyMedium)),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            'تشغيل الرسائل الصوتية غير متاح بعد؛ يلزم توفير مسار API آمن للتنزيل والتشغيل.',
-            style: theme.textTheme.bodySmall,
-          ),
-        ),
-      ],
+      if (message.isVoice) VoiceMessagePlayer(api: api, message: message),
       if (!message.isVoice || message.body != '🎙️ رسالة صوتية') Text(message.body, style: theme.textTheme.bodyLarge),
       if (message.answer != null && message.answer!.isNotEmpty) ...[const SizedBox(height: 14), Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: theme.extension<SarehnyPalette>()!.primarySoft, borderRadius: BorderRadius.circular(14)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('إجابتك المنشورة', style: theme.textTheme.labelMedium?.copyWith(color: theme.extension<SarehnyPalette>()!.primary, fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text(message.answer!, style: theme.textTheme.bodyMedium)]))],
       const SizedBox(height: 12),

@@ -15,6 +15,14 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+class VoicePlaybackRequest {
+  const VoicePlaybackRequest({required this.uri, required this.origin, required this.cookie});
+
+  final Uri uri;
+  final String origin;
+  final String cookie;
+}
+
 class ApiClient {
   ApiClient({String? baseUrl})
       : baseUrl = _normalizeBaseUrl(baseUrl ?? ApiConfig.apiBaseUrl),
@@ -79,6 +87,21 @@ class ApiClient {
       throw const ApiException('اسم المستخدم غير صالح.');
     }
     return siteOrigin.resolve('u.php').replace(queryParameters: {'n': username});
+  }
+
+  Uri voiceMessageUri(int messageId) {
+    if (messageId < 1 || baseUrl.isEmpty) {
+      throw const ApiException('معرّف الرسالة الصوتية غير صالح أو أن عنوان API غير مهيأ.');
+    }
+    return siteOrigin.resolve('voice.php').replace(queryParameters: {'id': '$messageId'});
+  }
+
+  Future<VoicePlaybackRequest> voicePlaybackRequest(int messageId) async {
+    final cookie = await _storage.read(key: 'sarehny_php_session');
+    if (cookie == null || !RegExp(r'^PHPSESSID=[A-Za-z0-9,-]{1,256}$').hasMatch(cookie)) {
+      throw const ApiException('انتهت جلسة الدخول. سجّل الدخول مجددًا لتشغيل الرسالة الصوتية.');
+    }
+    return VoicePlaybackRequest(uri: voiceMessageUri(messageId), origin: siteOrigin.origin, cookie: cookie);
   }
 
   Uri routeUri(String route, {Map<String, dynamic>? query}) {
