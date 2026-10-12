@@ -25,6 +25,15 @@ void main() {
       api.routeUri('blog/posts/24').toString(),
       'https://stage.sarehny.example/api/v1/index.php?r=blog%2Fposts%2F24',
     );
+    expect(
+      api.supportUri(action: 'poll', after: 42).toString(),
+      'https://stage.sarehny.example/support.php?a=poll&after=42',
+    );
+    expect(
+      api.supportUri(action: 'send').toString(),
+      'https://stage.sarehny.example/support.php?a=send&after=0',
+    );
+    expect(() => api.supportUri(action: 'admin_delete'), throwsA(isA<ApiException>()));
     expect(() => api.routeUri('../session'), throwsA(isA<ApiException>()));
   });
 

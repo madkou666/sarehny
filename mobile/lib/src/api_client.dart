@@ -29,15 +29,26 @@ class ApiClient {
     ));
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final cookie = await _storage.read(key: 'sarehny_php_session');
-        if (cookie != null && cookie.isNotEmpty) options.headers['Cookie'] = cookie;
+        final cookies = <String>[];
+        final sessionCookie = await _storage.read(key: 'sarehny_php_session');
+        final supportCookie = await _storage.read(key: 'sarehny_support_token');
+        if (sessionCookie != null && sessionCookie.isNotEmpty) cookies.add(sessionCookie);
+        if (options.uri.path.endsWith('/support.php') && supportCookie != null && supportCookie.isNotEmpty) {
+          cookies.add(supportCookie);
+        }
+        if (cookies.isNotEmpty) options.headers['Cookie'] = cookies.join('; ');
         handler.next(options);
       },
       onResponse: (response, handler) async {
         final values = response.headers.map['set-cookie'] ?? const <String>[];
         for (final value in values) {
           final cookie = value.split(';').first.trim();
-          if (cookie.startsWith('PHPSESSID=')) await _storage.write(key: 'sarehny_php_session', value: cookie);
+          if (cookie.startsWith('PHPSESSID=')) {
+            await _storage.write(key: 'sarehny_php_session', value: cookie);
+          } else if (response.requestOptions.uri.path.endsWith('/support.php') &&
+              RegExp(r'^sup_t=[a-f0-9]{48}$').hasMatch(cookie)) {
+            await _storage.write(key: 'sarehny_support_token', value: cookie);
+          }
         }
         handler.next(response);
       },
@@ -108,6 +119,7 @@ class ApiClient {
       await _post('auth/logout', {});
     } finally {
       await _storage.delete(key: 'sarehny_php_session');
+      await _storage.delete(key: 'sarehny_support_token');
       _csrf = null;
     }
   }
@@ -191,10 +203,80 @@ class ApiClient {
   Future<void> deleteAccount(String currentPassword, String username) async {
     await _post('account/delete', {'current_password': currentPassword, 'confirm_username': username});
     await _storage.delete(key: 'sarehny_php_session');
+    await _storage.delete(key: 'sarehny_support_token');
     _csrf = null;
   }
   Future<void> sendPublicMessage(String username, String body, {bool question = false}) async =>
       _post('public-messages', {'username': username, 'body': body, 'kind': question ? 'question' : 'message'});
+
+  Uri supportUri({required String action, int after = 0}) {
+    if (baseUrl.isEmpty || !const {'poll', 'send'}.contains(action) || after < 0) {
+      throw const ApiException('طلب الدعم الفني غير صالح أو أن عنوان API غير مهيأ.');
+    }
+    return siteOrigin.resolve('support.php').replace(queryParameters: {
+      'a': action,
+      'after': '$after',
+    });
+  }
+
+  Future<Map<String, dynamic>> supportPoll({int after = 0}) =>
+      _supportRequest('GET', 'poll', after: after);
+
+  Future<Map<String, dynamic>> supportSend(String body, {int after = 0}) async {
+    final message = body.trim();
+    if (message.isEmpty || message.length > 2000) {
+      throw const ApiException('اكتب رسالة دعم بين حرف واحد و٢٠٠٠ حرف.');
+    }
+    if (_csrf == null) await session();
+    final fields = <String, String>{'csrf': _csrf ?? '', 'body': message};
+    try {
+      return await _supportRequest('POST', 'send', after: after, fields: fields);
+    } on ApiException catch (error) {
+      if (error.statusCode != 400 || error.message != 'انتهت الجلسة، أعد تحميل الصفحة') rethrow;
+      _csrf = null;
+      final refreshed = await session();
+      if (refreshed['user'] == null) {
+        throw const ApiException('انتهت جلسة الدخول. سجّل الدخول مجددًا قبل مراسلة الدعم.');
+      }
+      return _supportRequest(
+        'POST',
+        'send',
+        after: after,
+        fields: {'csrf': _csrf ?? '', 'body': message},
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _supportRequest(
+    String method,
+    String action, {
+    int after = 0,
+    Map<String, String>? fields,
+  }) async {
+    try {
+      final response = await _dio.requestUri<dynamic>(
+        supportUri(action: action, after: after),
+        data: fields == null ? null : FormData.fromMap(fields),
+        options: Options(method: method),
+      );
+      final payload = response.data;
+      final data = payload is Map ? Map<String, dynamic>.from(payload) : <String, dynamic>{};
+      if (response.statusCode == null || response.statusCode! >= 400 || data['ok'] != true) {
+        final message = data['error'] as String? ?? data['message'] as String? ??
+            'تعذّر إكمال طلب الدعم (HTTP ${response.statusCode ?? 'غير معروف'}).';
+        throw ApiException(message, statusCode: response.statusCode);
+      }
+      return data;
+    } on DioException catch (error) {
+      final payload = error.response?.data;
+      if (payload is Map) {
+        final data = Map<String, dynamic>.from(payload);
+        final message = data['error'] as String? ?? data['message'] as String?;
+        if (message != null) throw ApiException(message, statusCode: error.response?.statusCode);
+      }
+      throw const ApiException('تعذّر الاتصال بخدمة الدعم الفني. تحقق من اتصال الإنترنت ثم أعد المحاولة.');
+    }
+  }
 
   Future<Map<String, dynamic>> account() => _request('GET', 'account');
   Future<Map<String, dynamic>> publicProfile(String username) => _request('GET', 'public-profile', query: {'username': username});

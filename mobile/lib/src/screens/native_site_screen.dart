@@ -353,7 +353,7 @@ class _NativeSiteScreenState extends State<NativeSiteScreen> {
         child: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), children: [
-            Text('خ��ّينا نسمعك.', style: Theme.of(context).textTheme.headlineMedium),
+            Text('خلّينا نسمعك.', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text('لديك فكرة أو سؤال أو ملاحظة؟ اكتب لنا وسنقرأ رسالتك.', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 22),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api_client.dart';
 import 'native_site_screen.dart';
+import 'support_screen.dart';
 
 class SiteHubScreen extends StatefulWidget {
   const SiteHubScreen({
@@ -64,6 +65,12 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
     ));
   }
 
+  void _openSupport() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SupportScreen(api: widget.api),
+    ));
+  }
+
   void _openUnavailable(String title, String detail) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => NativeFeatureUnavailableScreen(title: title, detail: detail),
@@ -83,9 +90,15 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                     title: Text(destination.label),
                     subtitle: Text(destination.description),
                     trailing: const Icon(Icons.chevron_left_rounded, size: 20),
-                    onTap: () => destination.page != null
-                        ? _openPage(destination.page!)
-                        : _openUnavailable(destination.label, destination.unavailableDetail!),
+                    onTap: () {
+                      if (destination.support) {
+                        _openSupport();
+                      } else if (destination.page != null) {
+                        _openPage(destination.page!);
+                      } else {
+                        _openUnavailable(destination.label, destination.unavailableDetail!);
+                      }
+                    },
                   ),
                 ),
               )),
@@ -177,7 +190,7 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                   _NativeDestination(label: 'مدونة أسرار', description: 'المقالات المنشورة من الخادم', icon: Icons.article_outlined, page: NativeSitePage.blog),
                   _NativeDestination(label: 'من نحن', description: 'محتوى التعريف المحفوظ على الموقع', icon: Icons.info_outline_rounded, page: NativeSitePage.about),
                   _NativeDestination(label: 'اتصل بنا', description: 'إرسال استفسار إلى فريق الموقع', icon: Icons.mail_outline_rounded, page: NativeSitePage.contact),
-                  _NativeDestination(label: 'الدعم الفني', description: 'واجهة محادثة الدعم تحتاج عقد API مستقلًا', icon: Icons.support_agent_rounded, unavailableDetail: 'صفحة الدعم الأصلية تعتمد على جلسة/رمز محادثة خاص غير متاح حاليًا في عقد تطبيق Flutter. لم أستبدلها بصفحة ويب أو بنموذج شكلي.'),
+                  _NativeDestination(label: 'الدعم الفني', description: 'تابع محادثة الموقع وأرسل رسالة لفريق الدعم', icon: Icons.support_agent_rounded, support: true),
                 ]),
                 _section('ميزات تحتاج واجهات API أصلية إضافية', [
                   const _NativeDestination(label: 'الرسائل الصوتية', description: 'التسجيل ورفع الملفات والتشغيل غير مربوطين بعد', icon: Icons.mic_none_rounded, unavailableDetail: 'يحتاج الصوت API آمنًا لتسجيل المقاطع ورفعها وتسليمها وتشغيلها، إلى جانب صلاحية الميكروفون واختبار Android.'),
@@ -206,13 +219,14 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
 }
 
 class _NativeDestination {
-  const _NativeDestination({required this.label, required this.description, required this.icon, this.page, this.unavailableDetail});
+  const _NativeDestination({required this.label, required this.description, required this.icon, this.page, this.unavailableDetail, this.support = false});
 
   final String label;
   final String description;
   final IconData icon;
   final NativeSitePage? page;
   final String? unavailableDetail;
+  final bool support;
 }
 
 class _OverviewStat extends StatelessWidget {
