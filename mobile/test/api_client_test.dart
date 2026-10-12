@@ -26,6 +26,10 @@ void main() {
       'https://stage.sarehny.example/api/v1/index.php?r=blog%2Fposts%2F24',
     );
     expect(
+      api.routeUri('inbox', query: {'filter': 'all', 'sort': 'oldest', 'q': 'مرحبا'}).queryParameters,
+      {'r': 'inbox', 'filter': 'all', 'sort': 'oldest', 'q': 'مرحبا'},
+    );
+    expect(
       api.supportUri(action: 'poll', after: 42).toString(),
       'https://stage.sarehny.example/support.php?a=poll&after=42',
     );

@@ -195,7 +195,7 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                 _section('ميزات تحتاج واجهات API أصلية إضافية', [
                   const _NativeDestination(label: 'الرسائل الصوتية', description: 'التسجيل ورفع الملفات والتشغيل غير مربوطين بعد', icon: Icons.mic_none_rounded, unavailableDetail: 'يحتاج الصوت API آمنًا لتسجيل المقاطع ورفعها وتسليمها وتشغيلها، إلى جانب صلاحية الميكروفون واختبار Android.'),
                   const _NativeDestination(label: 'الإحصاءات والتحليلات', description: 'تتطلب API يحدد الصلاحية ويعيد بيانات الحساب', icon: Icons.query_stats_rounded, unavailableDetail: 'لا توجد حاليًا نقطة API أصلية لبيانات الإحصاءات أو تفاصيل تحليل المرسل.'),
-                  const _NativeDestination(label: 'المختبر الاجتماعي', description: 'لا توجد نقطة API Flutter موثقة له', icon: Icons.science_outlined, unavailableDetail: 'المختبر الاجتماعي يستخدم مسارات PHP مستقلة؛ لم أفتح تلك الصفحات داخل التطبيق ولم أضف عمليات غير مختبرة.'),
+                  const _NativeDestination(label: 'المختبر الاجتماعي', description: 'يحتاج تدقيق واجهة PHP وحصص الذكاء الاصطناعي', icon: Icons.science_outlined, unavailableDetail: 'للموقع API مستقل للمختبر، لكنه يهيّئ جداول ديناميكيًا ويستهلك حصص مزوّد AI عند التوليد. لم أستدعِه من التطبيق قبل تدقيق تغييرات قاعدة البيانات والتكلفة وموافقة الخصوصية واختباره على staging.'),
                   const _NativeDestination(label: 'الإشعارات', description: 'Push Android يتطلب إعداد FCM على الخادم والتطبيق', icon: Icons.notifications_none_rounded, unavailableDetail: 'إعداد Firebase ومفتاح الإرسال وتسجيل أجهزة Android غير متوفر في المشروع؛ لن أظهر مفتاحًا شكليًا لا يحفظ تفضيلًا حقيقيًا.'),
                 ]),
                 if (widget.isAdmin)

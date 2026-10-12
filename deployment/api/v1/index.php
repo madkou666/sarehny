@@ -296,15 +296,23 @@ try {
     $user = api_require_user();
     $allowedFilters = ['all', 'questions', 'pending', 'published', 'favorites'];
     $filter = in_array((string)($_GET['filter'] ?? 'all'), $allowedFilters, true) ? (string)($_GET['filter'] ?? 'all') : 'all';
+    $sort = in_array((string)($_GET['sort'] ?? 'newest'), ['newest', 'oldest'], true) ? (string)($_GET['sort'] ?? 'newest') : 'newest';
+    $search = trim((string)($_GET['q'] ?? ''));
+    if (mb_strlen($search) > 100) api_error(422, 'عبارة البحث يجب ألا تتجاوز ١٠٠ حرف.');
     $page = max(1, min(10000, (int)($_GET['page'] ?? 1)));
     $limit = max(1, min(50, (int)($_GET['limit'] ?? 20)));
     $where = 'recipient_id=? AND is_removed=0';
+    $whereParams = [(int)$user['id']];
     if ($filter === 'questions') $where .= ' AND is_question=1';
     if ($filter === 'pending') $where .= ' AND is_question=1 AND answer IS NULL';
     if ($filter === 'published') $where .= ' AND is_question=1 AND answer IS NOT NULL';
     if ($filter === 'favorites') $where .= ' AND is_favorite=1';
+    if ($search !== '') {
+      $where .= " AND LOCATE(?, CONCAT(body, ' ', COALESCE(answer, ''))) > 0";
+      $whereParams[] = $search;
+    }
     $count = $pdo->prepare('SELECT COUNT(*) FROM messages WHERE ' . $where);
-    $count->execute([(int)$user['id']]);
+    $count->execute($whereParams);
     $total = (int)$count->fetchColumn();
     $beforeCreatedAt = trim((string)($_GET['before_created_at'] ?? ''));
     $beforeId = (int)($_GET['before_id'] ?? 0);
@@ -313,15 +321,17 @@ try {
       api_error(422, 'مؤشر ترقيم الرسائل غير صالح.');
     }
     $fetchWhere = $where;
-    $params = [(int)$user['id']];
+    $params = $whereParams;
     if ($hasCursor) {
-      $fetchWhere .= ' AND (created_at < ? OR (created_at = ? AND id < ?))';
+      $comparison = $sort === 'oldest' ? '>' : '<';
+      $fetchWhere .= ' AND (created_at ' . $comparison . ' ? OR (created_at = ? AND id ' . $comparison . ' ?))';
       $params[] = $beforeCreatedAt;
       $params[] = $beforeCreatedAt;
       $params[] = $beforeId;
     }
     $offset = $hasCursor ? 0 : ($page - 1) * $limit;
-    $stmt = $pdo->prepare('SELECT id,body,is_favorite,is_question,answer,answered_at,created_at,audio_path,audio_secs FROM messages WHERE ' . $fetchWhere . ' ORDER BY created_at DESC,id DESC LIMIT ' . ($limit + 1) . ' OFFSET ' . $offset);
+    $direction = $sort === 'oldest' ? 'ASC' : 'DESC';
+    $stmt = $pdo->prepare('SELECT id,body,is_favorite,is_question,answer,answered_at,created_at,audio_path,audio_secs FROM messages WHERE ' . $fetchWhere . ' ORDER BY created_at ' . $direction . ',id ' . $direction . ' LIMIT ' . ($limit + 1) . ' OFFSET ' . $offset);
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
     $hasMore = count($rows) > $limit;

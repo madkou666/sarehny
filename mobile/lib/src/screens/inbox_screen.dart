@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../app_theme.dart';
@@ -13,9 +15,13 @@ class InboxScreen extends StatefulWidget {
 
 class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClientMixin {
   final _scroll = ScrollController();
+  final _searchController = TextEditingController();
   final List<InboxMessage> _messages = [];
   Map<String, dynamic> _stats = {};
   String _filter = 'all';
+  String _query = '';
+  String _sort = 'newest';
+  Timer? _searchDebounce;
   int _page = 1;
   bool _loading = true;
   bool _loadingMore = false;
@@ -31,7 +37,18 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   @override
   void initState() { super.initState(); _scroll.addListener(_maybeLoadMore); _load(); }
   @override
-  void dispose() { _scroll.dispose(); super.dispose(); }
+  void dispose() { _searchDebounce?.cancel(); _searchController.dispose(); _scroll.dispose(); super.dispose(); }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      final query = value.trim();
+      if (query == _query) return;
+      _query = query;
+      _load(refresh: true);
+    });
+  }
 
   void _maybeLoadMore() {
     if (_scroll.hasClients && _scroll.position.pixels > _scroll.position.maxScrollExtent - 240 && !_loading && !_loadingMore && _hasMore) _loadMore();
@@ -40,6 +57,8 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   Future<void> _load({bool refresh = false}) async {
     final requestVersion = ++_requestVersion;
     final requestedFilter = _filter;
+    final requestedQuery = _query;
+    final requestedSort = _sort;
     if (refresh) {
       _messages.clear();
       _page = 1;
@@ -49,9 +68,9 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
     }
     setState(() { _loading = _messages.isEmpty; _loadingMore = false; _error = null; });
     try {
-      final result = await widget.api.inbox(filter: requestedFilter, page: 1);
+      final result = await widget.api.inbox(filter: requestedFilter, sort: requestedSort, query: requestedQuery, page: 1);
       final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(Map<String, dynamic>.from(value as Map))).toList();
-      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter) return;
+      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter || requestedQuery != _query || requestedSort != _sort) return;
       setState(() {
         _messages..clear()..addAll(items);
         _stats = Map<String, dynamic>.from(result['stats'] as Map? ?? {});
@@ -64,7 +83,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
         _loading = false;
       });
     } on Object catch (error) {
-      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter) {
+      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter && requestedQuery == _query && requestedSort == _sort) {
         setState(() { _error = error is ApiException ? error.message : 'تعذّر قراءة الرسائل من الخادم.'; _loading = false; });
       }
     }
@@ -73,17 +92,21 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
   Future<void> _loadMore() async {
     final requestVersion = _requestVersion;
     final requestedFilter = _filter;
+    final requestedQuery = _query;
+    final requestedSort = _sort;
     final requestedPage = _page + 1;
     setState(() => _loadingMore = true);
     try {
       final result = await widget.api.inbox(
         filter: requestedFilter,
+        sort: requestedSort,
+        query: requestedQuery,
         page: requestedPage,
         beforeCreatedAt: _cursorCreatedAt,
         beforeId: _cursorId,
       );
       final items = (result['messages'] as List<dynamic>? ?? []).map((value) => InboxMessage.fromJson(Map<String, dynamic>.from(value as Map))).toList();
-      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter) return;
+      if (!mounted || requestVersion != _requestVersion || requestedFilter != _filter || requestedQuery != _query || requestedSort != _sort) return;
       setState(() {
         final existingIds = _messages.map((message) => message.id).toSet();
         _messages.addAll(items.where((message) => existingIds.add(message.id)));
@@ -95,7 +118,7 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
         _cursorId = (cursor?['id'] as num?)?.toInt();
       });
     } on Object catch (error) {
-      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter) {
+      if (mounted && requestVersion == _requestVersion && requestedFilter == _filter && requestedQuery == _query && requestedSort == _sort) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error is ApiException ? error.message : 'تعذّر تحميل الرسائل الأقدم.')));
       }
     } finally {
@@ -178,6 +201,38 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
           const SizedBox(height: 20),
           Text('رسائلك الأخيرة', style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
+          TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'ابحث في نص الرسالة أو الإجابة',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                tooltip: 'مسح البحث',
+                onPressed: () {
+                  _searchController.clear();
+                  _onSearchChanged('');
+                },
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: _sort,
+            decoration: const InputDecoration(labelText: 'ترتيب الرسائل'),
+            items: const [
+              DropdownMenuItem(value: 'newest', child: Text('الأحدث أولًا')),
+              DropdownMenuItem(value: 'oldest', child: Text('الأقدم أولًا')),
+            ],
+            onChanged: (value) {
+              if (value == null || value == _sort) return;
+              setState(() => _sort = value);
+              _load(refresh: true);
+            },
+          ),
+          const SizedBox(height: 12),
           SizedBox(height: 42, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: _filters.length, separatorBuilder: (_, index) => const SizedBox(width: 8), itemBuilder: (context, index) {
             final (value, label) = _filters[index];
             final selected = _filter == value;
@@ -186,7 +241,11 @@ class _InboxScreenState extends State<InboxScreen> with AutomaticKeepAliveClient
         ]))),
         if (_loading) const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
         else if (_error != null) SliverFillRemaining(hasScrollBody: false, child: _EmptyState(icon: Icons.cloud_off_outlined, title: 'تعذّر تحميل الرسائل', message: _error!, actionLabel: 'أعد المحاولة', onAction: () => _load(refresh: true)))
-        else if (_messages.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: _EmptyState(icon: Icons.mark_email_read_outlined, title: 'صندوقك هادئ الآن', message: 'عندما تصلك رسالة مجهولة، ستظهر هنا. شارك رابطك الشخصي ليبدأ أصدقاؤك بالكتابة.'))
+        else if (_messages.isEmpty) SliverFillRemaining(hasScrollBody: false, child: _EmptyState(
+          icon: Icons.mark_email_read_outlined,
+          title: _query.isNotEmpty ? 'لا توجد نتائج مطابقة' : 'صندوقك هادئ الآن',
+          message: _query.isNotEmpty ? 'جرّب عبارة بحث أخرى أو امسح البحث لعرض رسائلك.' : 'عندما تصلك رسالة مجهولة، ستظهر هنا. شارك رابطك الشخصي ليبدأ أصدقاؤك بالكتابة.',
+        ))
         else SliverPadding(padding: const EdgeInsets.fromLTRB(18, 0, 18, 28), sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
           if (index == _messages.length) return _loadingMore ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())) : const SizedBox(height: 16);
           final message = _messages[index];

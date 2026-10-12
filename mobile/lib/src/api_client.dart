@@ -150,12 +150,16 @@ class ApiClient {
 
   Future<Map<String, dynamic>> inbox({
     String filter = 'all',
+    String sort = 'newest',
+    String query = '',
     int page = 1,
     int limit = 20,
     String? beforeCreatedAt,
     int? beforeId,
   }) => _request('GET', 'inbox', query: {
         'filter': filter,
+        'sort': sort,
+        if (query.trim().isNotEmpty) 'q': query.trim(),
         'page': page,
         'limit': limit,
         if (beforeCreatedAt != null && beforeId != null) 'before_created_at': beforeCreatedAt,
