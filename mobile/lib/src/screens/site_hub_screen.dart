@@ -95,6 +95,8 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                         _openSupport();
                       } else if (destination.openInbox) {
                         widget.onOpenInbox();
+                      } else if (destination.openSend) {
+                        widget.onSendMessage();
                       } else if (destination.page != null) {
                         _openPage(destination.page!);
                       } else {
@@ -196,9 +198,9 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
                 ]),
                 _section('ميزات مرتبطة', const [
                   _NativeDestination(label: 'تشغيل الرسائل الصوتية', description: 'افتح صندوق الرسائل لتشغيل التسجيلات الواردة بأمان', icon: Icons.play_circle_outline_rounded, openInbox: true),
+                  _NativeDestination(label: 'تسجيل رسالة صوتية', description: 'سجّل رسالة خاصة وأرسلها من واجهة Flutter', icon: Icons.mic_none_rounded, openSend: true),
                 ]),
                 _section('ميزات تحتاج واجهات API أصلية إضافية', [
-                  const _NativeDestination(label: 'تسجيل وإرسال الرسائل الصوتية', description: 'تسجيل الرسائل ورفعها غير متاحين بعد', icon: Icons.mic_none_rounded, unavailableDetail: 'تشغيل الرسائل الصوتية الواردة متاح من صندوق الرسائل بواجهة Android أصلية. أما التسجيل والإرسال فيحتاجان عقد API مستقلًا، وتحققًا من الملفات وحدود المعدل، واختبارات رفع وصلاحيات على staging.'),
                   const _NativeDestination(label: 'الإحصاءات والتحليلات', description: 'تتطلب API يحدد الصلاحية ويعيد بيانات الحساب', icon: Icons.query_stats_rounded, unavailableDetail: 'لا توجد حاليًا نقطة API أصلية لبيانات الإحصاءات أو تفاصيل تحليل المرسل.'),
                   const _NativeDestination(label: 'المختبر الاجتماعي', description: 'يحتاج تدقيق واجهة PHP وحصص الذكاء الاصطناعي', icon: Icons.science_outlined, unavailableDetail: 'للموقع API مستقل للمختبر، لكنه يهيّئ جداول ديناميكيًا ويستهلك حصص مزوّد AI عند التوليد. لم أستدعِه من التطبيق قبل تدقيق تغييرات قاعدة البيانات والتكلفة وموافقة الخصوصية واختباره على staging.'),
                   const _NativeDestination(label: 'الإشعارات', description: 'Push Android يتطلب إعداد FCM على الخادم والتطبيق', icon: Icons.notifications_none_rounded, unavailableDetail: 'إعداد Firebase ومفتاح الإرسال وتسجيل أجهزة Android غير متوفر في المشروع؛ لن أظهر مفتاحًا شكليًا لا يحفظ تفضيلًا حقيقيًا.'),
@@ -224,7 +226,7 @@ class _SiteHubScreenState extends State<SiteHubScreen> {
 }
 
 class _NativeDestination {
-  const _NativeDestination({required this.label, required this.description, required this.icon, this.page, this.unavailableDetail, this.support = false, this.openInbox = false});
+  const _NativeDestination({required this.label, required this.description, required this.icon, this.page, this.unavailableDetail, this.support = false, this.openInbox = false, this.openSend = false});
 
   final String label;
   final String description;
@@ -233,6 +235,7 @@ class _NativeDestination {
   final String? unavailableDetail;
   final bool support;
   final bool openInbox;
+  final bool openSend;
 }
 
 class _OverviewStat extends StatelessWidget {

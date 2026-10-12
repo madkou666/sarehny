@@ -258,6 +258,75 @@ try {
     ]);
   }
 
+  if ($method === 'POST' && $route === '/public-voice-messages') {
+    if (setting('messages_open', '1') !== '1') api_error(403, 'استقبال الرسائل متوقف مؤقتًا.');
+    $username = strtolower(trim((string)($_POST['username'] ?? '')));
+    if (!preg_match('/^[a-z0-9_]{3,30}$/D', $username)) api_error(422, 'اسم المستخدم غير صالح.');
+    $stmt = $pdo->prepare('SELECT id,is_disabled FROM users WHERE username=? LIMIT 1');
+    $stmt->execute([$username]);
+    $recipient = $stmt->fetch();
+    if (!$recipient || !empty($recipient['is_disabled'])) api_error(404, 'لم نعثر على هذا الحساب.');
+
+    $upload = $_FILES['voice'] ?? null;
+    if (!is_array($upload) || (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)($upload['tmp_name'] ?? ''))) {
+      $status = in_array((int)($upload['error'] ?? UPLOAD_ERR_NO_FILE), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 413 : 422;
+      api_error($status, 'تعذّر استلام التسجيل الصوتي. حاول تسجيله مرة أخرى.');
+    }
+    $size = (int)($upload['size'] ?? 0);
+    if ($size < 1 || $size > 6 * 1024 * 1024) api_error(413, 'التسجيل الصوتي يجب ألا يتجاوز ٦ ميجابايت.');
+    $duration = filter_var($_POST['voice_secs'] ?? null, FILTER_VALIDATE_INT);
+    if ($duration === false || $duration < 1 || $duration > 120) api_error(422, 'مدة التسجيل يجب أن تكون بين ثانية واحدة ودقيقتين.');
+    $mime = '';
+    if (function_exists('finfo_open')) {
+      $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
+      if ($fileInfo) {
+        $mime = (string)finfo_file($fileInfo, (string)$upload['tmp_name']);
+        finfo_close($fileInfo);
+      }
+    }
+    $header = (string)@file_get_contents((string)$upload['tmp_name'], false, null, 0, 12);
+    $isMp4Container = strlen($header) >= 8 && substr($header, 4, 4) === 'ftyp';
+    if (!$isMp4Container || !in_array($mime, ['audio/mp4', 'audio/x-m4a', 'video/mp4', 'application/octet-stream'], true)) {
+      api_error(422, 'صيغة التسجيل الصوتي غير مدعومة.');
+    }
+
+    $body = trim((string)($_POST['body'] ?? ''));
+    if ($body === '') $body = '🎙️ رسالة صوتية';
+    $maxLen = max(50, min(5000, (int)setting('max_len', '1000')));
+    if (mb_strlen($body) < 1 || mb_strlen($body) > $maxLen) api_error(422, 'نص الرسالة يجب ألا يتجاوز ' . $maxLen . ' حرف.');
+    if (find_banned_word($body) !== null) api_error(422, 'تحتوي الرسالة على كلمات غير مسموح بها.');
+    $ipHash = sender_hash();
+    $count = $pdo->prepare('SELECT COUNT(*) FROM messages WHERE sender_ip_hash=? AND created_at > NOW() - INTERVAL 10 MINUTE');
+    $count->execute([$ipHash]);
+    if ((int)$count->fetchColumn() >= max(1, (int)setting('rate_limit', '10'))) api_error(429, 'أرسلت رسائل كثيرة خلال وقت قصير. انتظر قليلًا.');
+    $banned = $pdo->prepare('SELECT 1 FROM sender_bans WHERE ip_hash=? LIMIT 1');
+    $banned->execute([$ipHash]);
+    if ($banned->fetchColumn()) api_error(403, 'تم إيقاف الإرسال من جهازك بسبب مخالفة سياسة الاستخدام.');
+
+    $directory = dirname(__DIR__, 2) . '/uploads/voice';
+    if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) api_error(500, 'تعذّر تجهيز مساحة حفظ التسجيل. تواصل مع إدارة الموقع.');
+    if (!is_writable($directory)) api_error(500, 'مساحة حفظ التسجيل غير قابلة للكتابة. تواصل مع إدارة الموقع.');
+    $filename = bin2hex(random_bytes(16)) . '.m4a';
+    $storedPath = $directory . '/' . $filename;
+    if (!move_uploaded_file((string)$upload['tmp_name'], $storedPath)) api_error(500, 'تعذّر حفظ التسجيل الصوتي. لم تُرسل الرسالة.');
+    try {
+      $pdo->prepare('INSERT INTO messages(recipient_id,body,sender_ip_hash,is_question,audio_path,audio_secs) VALUES(?,?,?,0,?,?)')->execute([(int)$recipient['id'], $body, $ipHash, $filename, $duration]);
+      $messageId = (int)$pdo->lastInsertId();
+      try { if (function_exists('save_message_meta')) save_message_meta($pdo, $messageId); } catch (Throwable $ignored) {}
+      try {
+        require_once dirname(__DIR__, 2) . '/push_lib.php';
+        if (function_exists('push_notify_user')) {
+          $preview = setting('push_preview', '1') === '1' ? mb_substr($body, 0, 180) : 'وصلتك رسالة صوتية جديدة، افتح صندوقك للاستماع إليها.';
+          push_notify_user((int)$recipient['id'], site_name(), '🔒 رسالة صوتية من مجهول: ' . $preview);
+        }
+      } catch (Throwable $ignored) {}
+      api_ok(['message_id' => $messageId, 'sent' => true], 201);
+    } catch (Throwable $error) {
+      if (is_file($storedPath)) @unlink($storedPath);
+      throw $error;
+    }
+  }
+
   if ($method === 'POST' && $route === '/public-messages') {
     global $pdo;
     if (setting('messages_open', '1') !== '1') api_error(403, 'استقبال الرسائل متوقف مؤقتًا.');
@@ -286,7 +355,7 @@ try {
       require_once dirname(__DIR__, 2) . '/push_lib.php';
       if (function_exists('push_notify_user')) {
         $preview = setting('push_preview', '1') === '1' ? mb_substr($body, 0, 180) : 'وصلتك رسالة جديدة، افتح صندوقك لقراءتها.';
-        push_notify_user((int)$recipient['id'], site_name(), ($kind ? '💬 سؤال جديد: ' : '🔒 رسالة من مجهول: ') . $preview);
+        push_notify_user((int)$recipient['id'], site_name(), ($kind ? '💬 س��ال جديد: ' : '🔒 رسالة من مجهول: ') . $preview);
       }
     } catch (Throwable $ignored) {}
     api_ok(['message_id' => $messageId, 'sent' => true], 201);
@@ -545,5 +614,5 @@ try {
 }
 
 // لتشغيل تحليل الشخصية استخدم المسار الحالي /ai_analyze.php، مع إرسال action=analyze وconsent=1 وcsrf.
-// أبقينا الذكاء الاصطناعي خارج وسيط JSON كي لا يتجاوز موافقة المستخدم أو آلية الحصص الموجودة في السكربت.
+// أبقينا الذكاء الاصطناعي خارج وسيط JSON كي لا يتجاوز موافقة المستخدم أ�� آلية الحصص الموجودة في السكربت.
 ?>

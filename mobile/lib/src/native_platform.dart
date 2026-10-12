@@ -9,6 +9,20 @@ class NativeImagePicker {
       _platform.invokeMapMethod<String, Object?>('pickImage');
 }
 
+class NativeVoiceRecording {
+  NativeVoiceRecording._();
+
+  static const _platform = MethodChannel('com.sarehny/platform');
+
+  static Future<void> start() => _platform.invokeMethod<void>('startVoiceRecording');
+
+  static Future<Map<String, Object?>?> stop() =>
+      _platform.invokeMapMethod<String, Object?>('stopVoiceRecording');
+
+  static Future<void> cancel() =>
+      _platform.invokeMethod<void>('cancelVoiceRecording');
+}
+
 class NativeVoicePlayback {
   NativeVoicePlayback._();
 

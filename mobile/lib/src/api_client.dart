@@ -243,6 +243,25 @@ class ApiClient {
   Future<void> sendPublicMessage(String username, String body, {bool question = false}) async =>
       _post('public-messages', {'username': username, 'body': body, 'kind': question ? 'question' : 'message'});
 
+  Future<void> sendPublicVoiceMessage({
+    required String username,
+    required Uint8List bytes,
+    required int durationSeconds,
+    String body = '',
+  }) async {
+    if (bytes.isEmpty || bytes.length > 6 * 1024 * 1024 || durationSeconds < 1 || durationSeconds > 120) {
+      throw const ApiException('التسجيل الصوتي غير صالح أو يتجاوز الحد المسموح.');
+    }
+    if (_csrf == null) await session();
+    await _request('POST', 'public-voice-messages', formData: FormData.fromMap({
+      'csrf': _csrf ?? '',
+      'username': username,
+      'body': body.trim(),
+      'voice_secs': '$durationSeconds',
+      'voice': MultipartFile.fromBytes(bytes, filename: 'voice.m4a'),
+    }));
+  }
+
   Uri supportUri({required String action, int after = 0}) {
     if (baseUrl.isEmpty || !const {'poll', 'send'}.contains(action) || after < 0) {
       throw const ApiException('طلب الدعم الفني غير صالح أو أن عنوان API غير مهيأ.');

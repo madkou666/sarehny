@@ -5,7 +5,10 @@ import android.content.Intent
 import android.database.Cursor
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.net.Uri
+import android.os.SystemClock
+import android.content.pm.PackageManager
 import android.provider.OpenableColumns
 import java.io.File
 import java.net.HttpURLConnection
@@ -24,15 +27,24 @@ class MainActivity : FlutterActivity() {
     private var voicePrepared = false
     private var voiceError: String? = null
     private var pendingVoiceResult: MethodChannel.Result? = null
+    private var voiceRecorder: MediaRecorder? = null
+    private var recordingFile: File? = null
+    private var recordingStartedAt = 0L
+    private var pendingRecordingPermissionResult: MethodChannel.Result? = null
     @Volatile private var voiceRequestGeneration = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        cacheDir.listFiles()?.filter { it.name.startsWith("sarehny-voice-") }?.forEach { it.delete() }
+        cacheDir.listFiles()?.filter {
+            it.name.startsWith("sarehny-voice-") || it.name.startsWith("sarehny-recording-")
+        }?.forEach { it.delete() }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "pickImage" -> pickImage(result)
+                    "startVoiceRecording" -> startVoiceRecording(result)
+                    "stopVoiceRecording" -> stopVoiceRecording(result)
+                    "cancelVoiceRecording" -> cancelVoiceRecording(result)
                     "playVoice" -> playVoice(call, result)
                     "pauseVoice" -> controlVoice(call, result) { it.pause() }
                     "resumeVoice" -> controlVoice(call, result) {
@@ -45,6 +57,105 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun startVoiceRecording(result: MethodChannel.Result) {
+        if (voiceRecorder != null || pendingRecordingPermissionResult != null) {
+            result.error("recording_active", "يوجد تسجيل صوتي قيد التنفيذ بالفعل.", null)
+            return
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingRecordingPermissionResult = result
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), RECORD_AUDIO_REQUEST_CODE)
+            return
+        }
+        beginVoiceRecording(result)
+    }
+
+    private fun beginVoiceRecording(result: MethodChannel.Result) {
+        val file = try {
+            File.createTempFile("sarehny-recording-", ".m4a", cacheDir)
+        } catch (_: Exception) {
+            result.error("recording_unavailable", "تعذّر تجهيز مساحة التسجيل على هذا الجهاز.", null)
+            return
+        }
+        var recorder: MediaRecorder? = null
+        try {
+            recorder = MediaRecorder()
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            recorder.setAudioChannels(1)
+            recorder.setAudioSamplingRate(44_100)
+            recorder.setAudioEncodingBitRate(96_000)
+            recorder.setMaxDuration(MAX_RECORDING_MILLIS)
+            recorder.setMaxFileSize(MAX_RECORDING_BYTES)
+            recorder.setOutputFile(file.absolutePath)
+            recorder.prepare()
+            recorder.start()
+            voiceRecorder = recorder
+            recordingFile = file
+            recordingStartedAt = SystemClock.elapsedRealtime()
+            result.success(null)
+        } catch (_: Exception) {
+            runCatching { recorder?.reset() }
+            runCatching { recorder?.release() }
+            voiceRecorder = null
+            file.delete()
+            result.error("recording_start_failed", "تعذّر بدء التسجيل. تحقق من إذن الميكروفون ثم حاول مجددًا.", null)
+        }
+    }
+
+    private fun stopVoiceRecording(result: MethodChannel.Result) {
+        val recorder = voiceRecorder
+        val file = recordingFile
+        if (recorder == null || file == null) {
+            result.error("recording_not_active", "لا يوجد تسجيل صوتي لإيقافه.", null)
+            return
+        }
+        voiceRecorder = null
+        recordingFile = null
+        val durationSeconds = ((SystemClock.elapsedRealtime() - recordingStartedAt + 999) / 1000).toInt()
+        recordingStartedAt = 0L
+        try {
+            recorder.stop()
+            recorder.release()
+            if (durationSeconds < 1 || file.length() < 1L || file.length() > MAX_RECORDING_BYTES) {
+                file.delete()
+                result.error("recording_too_short", "سجّل ثانية واحدة على الأقل، وبحد أقصى دقيقتين.", null)
+                return
+            }
+            val bytes = file.readBytes()
+            file.delete()
+            result.success(mapOf("bytes" to bytes, "durationSeconds" to durationSeconds.coerceAtMost(120)))
+        } catch (_: Exception) {
+            runCatching { recorder.reset() }
+            runCatching { recorder.release() }
+            file.delete()
+            result.error("recording_save_failed", "تعذّر حفظ التسجيل الصوتي. حاول مرة أخرى.", null)
+        }
+    }
+
+    private fun cancelVoiceRecording(result: MethodChannel.Result) {
+        runCatching { voiceRecorder?.stop() }
+        runCatching { voiceRecorder?.release() }
+        voiceRecorder = null
+        recordingFile?.delete()
+        recordingFile = null
+        recordingStartedAt = 0L
+        result.success(null)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != RECORD_AUDIO_REQUEST_CODE) return
+        val result = pendingRecordingPermissionResult ?: return
+        pendingRecordingPermissionResult = null
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            beginVoiceRecording(result)
+        } else {
+            result.error("microphone_permission_denied", "اسمح باستخدام الميكروفون لتسجيل رسالة صوتية.", null)
+        }
     }
 
     private fun playVoice(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
@@ -270,6 +381,13 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        runCatching { voiceRecorder?.stop() }
+        runCatching { voiceRecorder?.release() }
+        voiceRecorder = null
+        recordingFile?.delete()
+        recordingFile = null
+        pendingRecordingPermissionResult?.error("recording_cancelled", "أُغلق التطبيق قبل بدء التسجيل.", null)
+        pendingRecordingPermissionResult = null
         voiceRequestGeneration += 1
         pendingVoiceResult?.error("voice_cancelled", "أُغلق مشغل الصوت.", null)
         pendingVoiceResult = null
@@ -310,7 +428,7 @@ class MainActivity : FlutterActivity() {
                 try {
                     result.success(readImage(data.data!!))
                 } catch (error: IllegalArgumentException) {
-                    result.error("invalid_image", error.message ?: "اختر صورة مدعومة لا تتجاوز ١٠ ميجابايت.", null)
+                    result.error("invalid_image", error.message ?: "اختر صورة مد��ومة لا تتجاوز ١٠ ميجابايت.", null)
                 } catch (_: Exception) {
                     result.error("image_read_failed", "تعذّرت قراءة الصورة المختارة.", null)
                 }
@@ -362,7 +480,10 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val CHANNEL = "com.sarehny/platform"
         private const val IMAGE_REQUEST_CODE = 7202
+        private const val RECORD_AUDIO_REQUEST_CODE = 7203
         private const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
+        private const val MAX_RECORDING_BYTES = 6 * 1024 * 1024L
+        private const val MAX_RECORDING_MILLIS = 120_000
         private const val MAX_VOICE_BYTES = 7 * 1024 * 1024L
         private val VOICE_CONTENT_TYPES = setOf(
             "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"

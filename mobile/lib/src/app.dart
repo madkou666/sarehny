@@ -177,7 +177,7 @@ class _HomeShellState extends State<_HomeShell> {
               onSendMessage: () => setState(() => _index = 2),
             ),
             InboxScreen(api: widget.api),
-            PublicMessageScreen(api: widget.api),
+            PublicMessageScreen(api: widget.api, isActive: _index == 2),
             AccountScreen(
               api: widget.api,
               user: widget.user,
