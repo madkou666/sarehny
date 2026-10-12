@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sarehny_mobile/src/api_client.dart';
 
@@ -24,6 +26,10 @@ void main() {
     expect(
       api.routeUri('blog/posts/24').toString(),
       'https://stage.sarehny.example/api/v1/index.php?r=blog%2Fposts%2F24',
+    );
+    expect(
+      api.routeUri('public-voice-messages').toString(),
+      'https://stage.sarehny.example/api/v1/index.php?r=public-voice-messages',
     );
     expect(
       api.routeUri('inbox', query: {'filter': 'all', 'sort': 'oldest', 'q': 'مرحبا'}).queryParameters,
@@ -71,6 +77,19 @@ void main() {
     );
     expect(() => api.publicProfileUri('../admin'), throwsA(isA<ApiException>()));
     expect(() => api.publicProfileUri(''), throwsA(isA<ApiException>()));
+  });
+
+  test('voice uploads reject empty files and out-of-range durations before network access', () async {
+    final api = ApiClient(baseUrl: 'https://stage.sarehny.example/api/v1/');
+
+    await expectLater(
+      api.sendPublicVoiceMessage(username: 'sara_99', bytes: Uint8List(0), durationSeconds: 1),
+      throwsA(isA<ApiException>()),
+    );
+    await expectLater(
+      api.sendPublicVoiceMessage(username: 'sara_99', bytes: Uint8List.fromList([1]), durationSeconds: 121),
+      throwsA(isA<ApiException>()),
+    );
   });
 
   test('default profile links point to the original Sarehny site', () {

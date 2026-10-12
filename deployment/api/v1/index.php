@@ -287,11 +287,11 @@ try {
     $header = (string)@file_get_contents((string)$upload['tmp_name'], false, null, 0, 12);
     $isMp4Container = strlen($header) >= 8 && substr($header, 4, 4) === 'ftyp';
     if (!$isMp4Container || !in_array($mime, ['audio/mp4', 'audio/x-m4a', 'video/mp4', 'application/octet-stream'], true)) {
-      api_error(422, 'صيغة التسجيل الصوتي غير مدعومة.');
+      api_error(422, 'صيغة الت��جيل الصوتي غير مدعومة.');
     }
 
     $body = trim((string)($_POST['body'] ?? ''));
-    if ($body === '') $body = '🎙️ رسالة صوتية';
+    if ($body === '') $body = 'رسالة صوتية';
     $maxLen = max(50, min(5000, (int)setting('max_len', '1000')));
     if (mb_strlen($body) < 1 || mb_strlen($body) > $maxLen) api_error(422, 'نص الرسالة يجب ألا يتجاوز ' . $maxLen . ' حرف.');
     if (find_banned_word($body) !== null) api_error(422, 'تحتوي الرسالة على كلمات غير مسموح بها.');
@@ -301,11 +301,19 @@ try {
     if ((int)$count->fetchColumn() >= max(1, (int)setting('rate_limit', '10'))) api_error(429, 'أرسلت رسائل كثيرة خلال وقت قصير. انتظر قليلًا.');
     $banned = $pdo->prepare('SELECT 1 FROM sender_bans WHERE ip_hash=? LIMIT 1');
     $banned->execute([$ipHash]);
-    if ($banned->fetchColumn()) api_error(403, 'تم إيقاف الإرسال من جهازك بسبب مخالفة سياسة الاستخدام.');
+    if ($banned->fetchColumn()) api_error(403, 'تم إيقاف الإرسال من جه��زك بسبب مخالفة سياسة الاستخدام.');
 
     $directory = dirname(__DIR__, 2) . '/uploads/voice';
     if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) api_error(500, 'تعذّر تجهيز مساحة حفظ التسجيل. تواصل مع إدارة الموقع.');
-    if (!is_writable($directory)) api_error(500, 'مساحة حفظ التسجيل غير قابلة للكتابة. تواصل مع إدارة الموقع.');
+    if (is_link($directory) || !is_writable($directory)) api_error(500, 'مساحة حفظ التسجيل غير آمنة أو غير قابلة للكتابة. تواصل مع إدارة الموقع.');
+    $accessPath = $directory . '/.htaccess';
+    if (is_link($accessPath) || (file_exists($accessPath) && !is_file($accessPath))) api_error(500, 'تعذّر تأمين ملفات التسجيل من الوصول المباشر. لم يُرسل التسجيل.');
+    $accessRules = @file_get_contents($accessPath);
+    if ($accessRules === false) {
+      if (file_exists($accessPath) || @file_put_contents($accessPath, "Require all denied\n", LOCK_EX) === false) api_error(500, 'تعذّر تأمين ملفات التسجيل من الوصول المباشر. لم يُرسل التسجيل.');
+    } elseif (!preg_match('/^\s*Require\s+all\s+denied\s*$/im', $accessRules) && !preg_match('/^\s*Deny\s+from\s+all\s*$/im', $accessRules)) {
+      if (@file_put_contents($accessPath, rtrim($accessRules) . "\nRequire all denied\n", LOCK_EX) === false) api_error(500, 'تعذّر تأمين ملفات التسجيل من الوصول المباشر. لم يُرسل التسجيل.');
+    }
     $filename = bin2hex(random_bytes(16)) . '.m4a';
     $storedPath = $directory . '/' . $filename;
     if (!move_uploaded_file((string)$upload['tmp_name'], $storedPath)) api_error(500, 'تعذّر حفظ التسجيل الصوتي. لم تُرسل الرسالة.');
@@ -317,7 +325,7 @@ try {
         require_once dirname(__DIR__, 2) . '/push_lib.php';
         if (function_exists('push_notify_user')) {
           $preview = setting('push_preview', '1') === '1' ? mb_substr($body, 0, 180) : 'وصلتك رسالة صوتية جديدة، افتح صندوقك للاستماع إليها.';
-          push_notify_user((int)$recipient['id'], site_name(), '🔒 رسالة صوتية من مجهول: ' . $preview);
+          push_notify_user((int)$recipient['id'], site_name(), 'رسالة صوتية من مجهول: ' . $preview);
         }
       } catch (Throwable $ignored) {}
       api_ok(['message_id' => $messageId, 'sent' => true], 201);
