@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_config.dart';
+import 'app_theme.dart';
 import 'models.dart';
 
 class ApiException implements Exception {
@@ -130,6 +131,9 @@ class ApiClient {
       final theme = data['theme'];
       if (theme is! Map) throw const ApiException('إعدادات المظهر من الخادم غير صالحة.');
       final value = Map<String, dynamic>.from(theme);
+      if (!SarehnyPalette.isValidServerTheme(value)) {
+        throw const ApiException('إعدادات المظهر من الخادم غير مكتملة أو غير صالحة.');
+      }
       try {
         await _storage.write(key: 'sarehny_app_theme_cache', value: jsonEncode(value));
       } catch (_) {}
@@ -140,7 +144,10 @@ class ApiClient {
         try {
           final decoded = jsonDecode(cached);
           if (decoded is Map) {
-            return {'theme': Map<String, dynamic>.from(decoded), 'cached': true};
+            final cachedTheme = Map<String, dynamic>.from(decoded);
+            if (SarehnyPalette.isValidServerTheme(cachedTheme)) {
+              return {'theme': cachedTheme, 'cached': true};
+            }
           }
         } catch (_) {}
       }

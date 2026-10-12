@@ -46,5 +46,36 @@ void main() {
       expect(palette.primary, SarehnyPalette.defaults.primary);
       expect(palette.radius, 24);
     });
+
+    test('accepts only complete server palettes with safe colors and radius', () {
+      final validTheme = <String, dynamic>{
+        'colors': {
+          'bg': '#06070a',
+          'surface': '#0b0d12',
+          'raised': '#202328',
+          'ink': '#eef1f2',
+          'ink_2': '#c4ccd1',
+          'muted': '#8f9aa7',
+          'border': '#262b34',
+          'primary': '#3df0c0',
+          'secondary': '#ff4d8d',
+          'success': '#3df0c0',
+          'warning': '#f5c14e',
+          'danger': '#ff6c96',
+          'info': '#82abff',
+        },
+        'radius': 8,
+      };
+
+      expect(SarehnyPalette.isValidServerTheme(validTheme), isTrue);
+      expect(
+        SarehnyPalette.isValidServerTheme({
+          ...validTheme,
+          'colors': {'bg': 'url(unsafe)'},
+        }),
+        isFalse,
+      );
+      expect(SarehnyPalette.isValidServerTheme({...validTheme, 'radius': 25}), isFalse);
+    });
   });
 }

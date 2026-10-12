@@ -67,6 +67,35 @@ class SarehnyPalette extends ThemeExtension<SarehnyPalette> {
     radius: 8,
   );
 
+  static const serverColorKeys = [
+    'bg',
+    'surface',
+    'raised',
+    'ink',
+    'ink_2',
+    'muted',
+    'border',
+    'primary',
+    'secondary',
+    'success',
+    'warning',
+    'danger',
+    'info',
+  ];
+
+  static bool isValidServerTheme(Map<String, dynamic> value) {
+    final colorsValue = value['colors'];
+    final radiusValue = value['radius'];
+    if (colorsValue is! Map || radiusValue is! num || !radiusValue.isFinite || radiusValue % 1 != 0 || radiusValue < 0 || radiusValue > 24) {
+      return false;
+    }
+    final colors = Map<String, dynamic>.from(colorsValue);
+    return serverColorKeys.every((key) {
+      final color = colors[key];
+      return color is String && RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(color);
+    });
+  }
+
   factory SarehnyPalette.fromServer(Map<String, dynamic> value) {
     final colors = value['colors'] is Map
         ? Map<String, dynamic>.from(value['colors'] as Map)
