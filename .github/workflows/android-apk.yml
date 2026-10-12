@@ -6,6 +6,7 @@ on:
       - 'mobile/**'
       - 'deployment/api/v1/**'
       - 'deployment/hostinger-api-v1.zip'
+      - 'deployment/hostinger-staging.zip'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
     inputs:
@@ -53,6 +54,31 @@ jobs:
           source_hash=$(sha256sum deployment/api/v1/index.php | cut -d ' ' -f 1)
           archive_hash=$(unzip -p deployment/hostinger-api-v1.zip api/v1/index.php | sha256sum | cut -d ' ' -f 1)
           test "$source_hash" = "$archive_hash"
+          python - <<'PY'
+          from pathlib import PurePosixPath
+          from zipfile import ZipFile
+          import hashlib
+
+          path = 'deployment/hostinger-staging.zip'
+          with ZipFile(path) as archive:
+              names = archive.namelist()
+              if len(names) != len(set(names)):
+                  raise SystemExit('Staging archive contains duplicate paths.')
+              required = {'install.php', 'schema.sql', 'api/v1/index.php', 'api/v1/.htaccess', '.htaccess'}
+              if not required.issubset(names):
+                  raise SystemExit('Staging archive is missing installer, schema, API, or root access rules.')
+              forbidden = [name for name in names if PurePosixPath(name).name in {'config.php', 'config.sample.php'} or name.startswith(('uploads/', 'admin-restore/'))]
+              if forbidden:
+                  raise SystemExit('Staging archive contains environment or user data paths: ' + ', '.join(forbidden))
+              if hashlib.sha256(archive.read('api/v1/index.php')).hexdigest() != hashlib.sha256(open('deployment/api/v1/index.php', 'rb').read()).hexdigest():
+                  raise SystemExit('Staging archive API does not match the reviewed deployment source.')
+              if 'X-Robots-Tag' not in archive.read('.htaccess').decode():
+                  raise SystemExit('Staging archive must include noindex response headers.')
+          PY
+          staging_dir=$(mktemp -d)
+          trap 'rm -rf "$staging_dir"' EXIT
+          unzip -q deployment/hostinger-staging.zip -d "$staging_dir"
+          find "$staging_dir" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
