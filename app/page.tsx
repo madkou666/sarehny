@@ -60,7 +60,19 @@ export default function Home() {
           <div className="mt-5 flex items-center justify-between rounded-2xl border border-dashed border-[#ddd7eb] px-4 py-3"><span><strong className="block text-sm">نسخة Android</strong><small className="text-xs text-[#8b90a0]">مصدر Flutter، وليس WebView</small></span><span className="size-2 rounded-full bg-[#2f8f76]" aria-label="تصميم RTL" /></div>
         </section>
       </section>
-      <footer className="mx-auto max-w-6xl px-5 pb-9 text-center text-xs leading-6 text-[#989cac] sm:px-8">هذه معاينة تفاعلية للتصميم ببيانات تجريبية فقط. تسجيل الدخول والبيانات الحقيقية تعمل من تطبيق Flutter بعد نشر API على الاستضافة.</footer>
+      <section aria-labelledby="latest-download-title" className="mx-auto mt-2 w-full max-w-6xl px-5 sm:px-8">
+        <div className="flex flex-col items-center justify-between gap-5 rounded-[28px] border border-[#e9e6f1] bg-white px-5 py-6 shadow-[0_18px_50px_-36px_rgba(45,34,82,.35)] sm:flex-row sm:px-7">
+          <div className="text-center sm:text-right">
+            <span className="inline-flex items-center gap-2 text-xs font-bold text-[#7357c8]"><Download size={15} aria-hidden="true" /> آخر نسخة جاهزة للرفع</span>
+            <h2 id="latest-download-title" className="mt-2 text-lg font-extrabold">حمّل المشروع كاملًا إلى حساب v0 الجديد</h2>
+            <p className="mt-1 max-w-xl text-xs leading-6 text-[#7d8292]">الأرشيف يتضمن نسخة Flutter وواجهة Next.js وملفات API المحدثة. بعد التنزيل ارفعه إلى v0 كمشروع جديد.</p>
+          </div>
+          <a href="/downloads/saraha-complete-latest.zip" download className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#7357c8] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#6145b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7357c8] sm:w-auto">
+            <Download size={18} aria-hidden="true" /> تنزيل آخر نسخة كاملة
+          </a>
+        </div>
+      </section>
+      <footer className="mx-auto max-w-6xl px-5 pb-9 pt-6 text-center text-xs leading-6 text-[#989cac] sm:px-8">هذه معاينة تفاعلية للتصميم ببيانات تجريبية فقط. تسجيل الدخول والبيانات الحقيقية تعمل من تطبيق Flutter بعد نشر API على الاستضافة.</footer>
     </main>
   )
 }
