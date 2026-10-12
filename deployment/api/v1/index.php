@@ -90,6 +90,39 @@ function api_public_theme() {
   ];
 }
 
+function api_blog_item(array $post, int $excerptLimit = 180, bool $includeBody = false) {
+  $body = (string)($post['body'] ?? '');
+  $excerpt = trim((string)($post['excerpt'] ?? ''));
+  if ($excerpt === '') $excerpt = mb_substr(trim($body), 0, $excerptLimit);
+  $item = [
+    'id' => (int)$post['id'],
+    'title' => (string)$post['title'],
+    'excerpt' => $excerpt,
+    'created_at' => (string)$post['created_at'],
+  ];
+  if ($includeBody) $item['body'] = $body;
+  return $item;
+}
+
+function api_public_blog_posts(int $limit = 3) {
+  global $pdo;
+  $limit = max(1, min(60, $limit));
+  $rows = $pdo->query('SELECT id,title,excerpt,body,created_at FROM blog_posts WHERE published=1 ORDER BY created_at DESC,id DESC LIMIT ' . $limit)->fetchAll();
+  return array_map(static fn($post) => api_blog_item($post), $rows);
+}
+
+function api_public_profile_answers(int $userId) {
+  global $pdo;
+  $stmt = $pdo->prepare('SELECT id,body,answer,answered_at FROM messages WHERE recipient_id=? AND is_question=1 AND answer IS NOT NULL AND is_removed=0 ORDER BY answered_at DESC,id DESC LIMIT 20');
+  $stmt->execute([$userId]);
+  return array_map(static fn($row) => [
+    'id' => (int)$row['id'],
+    'question' => (string)$row['body'],
+    'answer' => (string)$row['answer'],
+    'answered_at' => $row['answered_at'],
+  ], $stmt->fetchAll());
+}
+
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $requestPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/api/v1'), PHP_URL_PATH) ?: '/api/v1';
 $scriptDir = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/api/v1/index.php'))), '/');
@@ -102,6 +135,50 @@ try {
 
   if ($method === 'GET' && in_array($route, ['/app-theme', '/theme-public'], true)) {
     api_ok(['theme' => api_public_theme()]);
+  }
+
+  if ($method === 'GET' && $route === '/site/home') {
+    api_ok([
+      'title' => (string)setting('home_title', 'مساحة للكلام الذي لم يُقَل'),
+      'lead' => (string)setting('home_lead', 'أنشئ رابطك الخاص، شاركه مع من تحب، واستقبل كلماتهم الصادقة في صندوق لا يراه سواك.'),
+      'posts' => api_public_blog_posts(3),
+    ]);
+  }
+
+  if ($method === 'GET' && $route === '/site/about') {
+    api_ok([
+      'title' => (string)setting('about_title', 'مساحة تجعل الصراحة أسهل'),
+      'intro' => (string)setting('about_intro', 'أسرار مساحة لمشاركة الكلمات الصادقة. أنشئ رابطًا خاصًا بك واستقبل رسائل من الآخرين دون ظهور أسمائهم لك.'),
+      'body' => (string)setting('about_body', ''),
+    ]);
+  }
+
+  if ($method === 'GET' && $route === '/blog/posts') {
+    api_ok(['posts' => api_public_blog_posts(60)]);
+  }
+
+  if ($method === 'GET' && preg_match('#^/blog/posts/(\d+)$#D', $route, $match)) {
+    $stmt = $pdo->prepare('SELECT id,title,excerpt,body,created_at FROM blog_posts WHERE id=? AND published=1 LIMIT 1');
+    $stmt->execute([(int)$match[1]]);
+    $post = $stmt->fetch();
+    if (!$post) api_error(404, 'المقال غير موجود أو لم يُنشر.');
+    api_ok(['post' => api_blog_item($post, 1200, true)]);
+  }
+
+  if ($method === 'POST' && $route === '/contact') {
+    $name = trim((string)($_POST['name'] ?? ''));
+    $email = strtolower(trim((string)($_POST['email'] ?? '')));
+    $subject = trim((string)($_POST['subject'] ?? ''));
+    $body = trim((string)($_POST['body'] ?? ''));
+    if (trim((string)($_POST['website'] ?? '')) !== '') api_error(422, 'تعذّر إرسال الرسالة. حاول مرة أخرى.');
+    if (mb_strlen($name) < 2 || mb_strlen($name) > 100) api_error(422, 'الاسم يجب أن يكون بين حرفين و١٠٠ حرف.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) api_error(422, 'أدخل بريدًا إلكترونيًا صحيحًا.');
+    if (mb_strlen($subject) < 3 || mb_strlen($subject) > 180) api_error(422, 'الموضوع يجب أن يكون بين ٣ و١٨٠ حرفًا.');
+    if (mb_strlen($body) < 10 || mb_strlen($body) > 5000) api_error(422, 'الرسالة يجب أن تكون بين ١٠ و٥٠٠٠ حرف.');
+    if (time() - (int)($_SESSION['api_last_contact_at'] ?? 0) < 60) api_error(429, 'انتظر دقيقة قبل إرسال رسالة أخرى.');
+    $pdo->prepare('INSERT INTO contact_messages(name,email,subject,body) VALUES(?,?,?,?)')->execute([$name, $email, $subject, $body]);
+    $_SESSION['api_last_contact_at'] = time();
+    api_ok(['sent' => true], 201);
   }
 
   if ($method === 'GET' && $route === '/session') {
@@ -170,7 +247,15 @@ try {
     $stmt->execute([$username]);
     $profile = $stmt->fetch();
     if (!$profile || !empty($profile['is_disabled'])) api_error(404, 'لم نعثر على هذا الحساب.');
-    api_ok(['profile' => ['username' => (string)$profile['username'], 'display_name' => (string)$profile['display_name'], 'avatar_url' => !empty($profile['avatar']) && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', (string)$profile['avatar']) ? api_origin() . '/uploads/avatars/' . rawurlencode($profile['avatar']) : null, 'is_verified' => !empty($profile['is_verified'])]]);
+    api_ok([
+      'profile' => [
+        'username' => (string)$profile['username'],
+        'display_name' => (string)$profile['display_name'],
+        'avatar_url' => !empty($profile['avatar']) && preg_match('/^[a-f0-9]{32}\.(jpg|png|webp|gif)$/D', (string)$profile['avatar']) ? api_origin() . '/uploads/avatars/' . rawurlencode($profile['avatar']) : null,
+        'is_verified' => !empty($profile['is_verified']),
+      ],
+      'answers' => api_public_profile_answers((int)$profile['id']),
+    ]);
   }
 
   if ($method === 'POST' && $route === '/public-messages') {
@@ -190,7 +275,7 @@ try {
     $ipHash = sender_hash();
     $count = $pdo->prepare('SELECT COUNT(*) FROM messages WHERE sender_ip_hash=? AND created_at > NOW() - INTERVAL 10 MINUTE');
     $count->execute([$ipHash]);
-    if ((int)$count->fetchColumn() >= max(1, (int)setting('rate_limit', '10'))) api_error(429, 'أرسلت رسائل كثيرة خلال وقت قصير. انتظر قليلًا.');
+    if ((int)$count->fetchColumn() >= max(1, (int)setting('rate_limit', '10'))) api_error(429, 'أ��سلت رسائل كثيرة خلال وقت قصير. انتظر قليلًا.');
     $banned = $pdo->prepare('SELECT 1 FROM sender_bans WHERE ip_hash=? LIMIT 1');
     $banned->execute([$ipHash]);
     if ($banned->fetchColumn()) api_error(403, 'تم إيقاف الإرسال من جهازك بسبب مخالفة سياسة الاستخدام.');

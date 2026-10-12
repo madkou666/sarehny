@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import '../api_client.dart';
 import '../app_theme.dart';
 import '../models.dart';
-import '../site_browser.dart';
+import 'native_site_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.api, required this.onSignedIn});
@@ -35,16 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _identifier.dispose();
     _password.dispose();
     super.dispose();
-  }
-
-  Future<void> _openSiteHome() async {
-    try {
-      await SiteBrowser.open(widget.api, SitePagePaths.home);
-    } on PlatformException catch (error) {
-      if (mounted) setState(() => _error = error.message ?? 'تعذّر فتح موقع صراحة.');
-    } on ApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
-    }
   }
 
   Future<void> _submit() async {
@@ -263,9 +253,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               : 'ليس لديك حساب؟ أنشئ حسابًا'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: _busy ? null : _openSiteHome,
+                          onPressed: _busy
+                              ? null
+                              : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                                    builder: (_) => NativeSiteScreen(api: widget.api, page: NativeSitePage.home),
+                                  )),
                           icon: const Icon(Icons.language_rounded),
-                          label: const Text('تصفح موقع صراحة'),
+                          label: const Text('تصفح الصفحة الرئيسية'),
                         ),
                         const SizedBox(height: 8),
                         Center(

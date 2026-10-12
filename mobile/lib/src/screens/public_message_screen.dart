@@ -3,8 +3,9 @@ import '../api_client.dart';
 import '../app_theme.dart';
 
 class PublicMessageScreen extends StatefulWidget {
-  const PublicMessageScreen({super.key, required this.api});
+  const PublicMessageScreen({super.key, required this.api, this.initialUsername});
   final ApiClient api;
+  final String? initialUsername;
   @override
   State<PublicMessageScreen> createState() => _PublicMessageScreenState();
 }
@@ -17,6 +18,13 @@ class _PublicMessageScreenState extends State<PublicMessageScreen> {
   bool _question = false;
   String? _error;
   Map<String, dynamic>? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _username.text = widget.initialUsername ?? '';
+    if (_username.text.isNotEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => _lookup());
+  }
 
   @override
   void dispose() { _username.dispose(); _message.dispose(); super.dispose(); }

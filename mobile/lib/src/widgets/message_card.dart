@@ -3,10 +3,9 @@ import '../app_theme.dart';
 import '../models.dart';
 
 class MessageCard extends StatelessWidget {
-  const MessageCard({super.key, required this.message, required this.onAction, this.onOpenOriginalInbox});
+  const MessageCard({super.key, required this.message, required this.onAction});
   final InboxMessage message;
   final Future<void> Function(String action, Map<String, String> fields) onAction;
-  final VoidCallback? onOpenOriginalInbox;
 
   String _dateLabel(DateTime date) {
     final age = DateTime.now().difference(date);
@@ -115,15 +114,13 @@ class MessageCard extends StatelessWidget {
             Expanded(child: Text('رسالة صوتية${message.audioSeconds == null ? '' : ' · ${message.audioSeconds} ثانية'}', style: theme.textTheme.bodyMedium)),
           ]),
         ),
-        if (onOpenOriginalInbox != null)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton.icon(
-              onPressed: onOpenOriginalInbox,
-              icon: const Icon(Icons.headphones_outlined, size: 18),
-              label: const Text('فتح صندوق الموقع للاستماع'),
-            ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            'تشغيل الرسائل الصوتية غير متاح بعد؛ يلزم توفير مسار API آمن للتنزيل والتشغيل.',
+            style: theme.textTheme.bodySmall,
           ),
+        ),
       ],
       if (!message.isVoice || message.body != '🎙️ رسالة صوتية') Text(message.body, style: theme.textTheme.bodyLarge),
       if (message.answer != null && message.answer!.isNotEmpty) ...[const SizedBox(height: 14), Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: theme.extension<SarehnyPalette>()!.primarySoft, borderRadius: BorderRadius.circular(14)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('إجابتك المنشورة', style: theme.textTheme.labelMedium?.copyWith(color: theme.extension<SarehnyPalette>()!.primary, fontWeight: FontWeight.w700)), const SizedBox(height: 5), Text(message.answer!, style: theme.textTheme.bodyMedium)]))],

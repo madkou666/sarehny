@@ -61,13 +61,12 @@ class ApiClient {
 
   final String baseUrl;
   Uri get siteOrigin => Uri.parse(baseUrl).resolve('../../');
-  Uri get adminUrl => sitePage('admin.php');
 
-  Uri sitePage(String path, {Map<String, String>? queryParameters}) {
-    if (baseUrl.isEmpty || !RegExp(r'^[a-zA-Z0-9_-]+(?:\.php)?$').hasMatch(path)) {
-      throw const ApiException('رابط صفحة الموقع غير صالح أو أن عنوان API غير مهيأ.');
+  Uri publicProfileUri(String username) {
+    if (!RegExp(r'^[a-zA-Z0-9_]{3,30}$').hasMatch(username)) {
+      throw const ApiException('اسم المستخدم غير صالح.');
     }
-    return siteOrigin.resolve(path).replace(queryParameters: queryParameters);
+    return siteOrigin.resolve('u.php').replace(queryParameters: {'n': username});
   }
 
   Uri routeUri(String route, {Map<String, dynamic>? query}) {
@@ -161,13 +160,6 @@ class ApiClient {
 
   Future<String?> readPhpSessionCookie() => _storage.read(key: 'sarehny_php_session');
 
-  Future<void> savePhpSessionCookie(String cookie) async {
-    if (!RegExp(r'^PHPSESSID=[A-Za-z0-9,-]{8,256}$').hasMatch(cookie)) {
-      throw const ApiException('تعذّر تحديث جلسة الموقع بسبب استجابة غير صالحة.');
-    }
-    await _storage.write(key: 'sarehny_php_session', value: cookie);
-  }
-
   Future<AppUser> uploadAvatar(Uint8List bytes, {required String fileName}) async {
     if (_csrf == null) await session();
     final data = await _request(
@@ -206,6 +198,12 @@ class ApiClient {
 
   Future<Map<String, dynamic>> account() => _request('GET', 'account');
   Future<Map<String, dynamic>> publicProfile(String username) => _request('GET', 'public-profile', query: {'username': username});
+  Future<Map<String, dynamic>> siteHome() => _request('GET', 'site/home');
+  Future<Map<String, dynamic>> siteAbout() => _request('GET', 'site/about');
+  Future<Map<String, dynamic>> blogPosts() => _request('GET', 'blog/posts');
+  Future<Map<String, dynamic>> blogPost(int id) => _request('GET', 'blog/posts/$id');
+  Future<void> sendContactMessage({required String name, required String email, required String subject, required String body}) async =>
+      _post('contact', {'name': name, 'email': email, 'subject': subject, 'body': body});
 
   Future<Map<String, dynamic>> analyzePersonality() async {
     if (_csrf == null) await session();

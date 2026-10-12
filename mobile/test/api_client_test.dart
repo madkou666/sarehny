@@ -21,6 +21,10 @@ void main() {
       api.routeUri('theme-public').toString(),
       'https://stage.sarehny.example/api/v1/index.php?r=theme-public',
     );
+    expect(
+      api.routeUri('blog/posts/24').toString(),
+      'https://stage.sarehny.example/api/v1/index.php?r=blog%2Fposts%2F24',
+    );
     expect(() => api.routeUri('../session'), throwsA(isA<ApiException>()));
   });
 
@@ -39,26 +43,21 @@ void main() {
     );
   });
 
-  test('site pages resolve to the PHP API origin', () {
+  test('public profile URLs are generated from a validated username', () {
     final api = ApiClient(baseUrl: 'https://stage.sarehny.example/api/v1/');
 
     expect(api.siteOrigin.origin, 'https://stage.sarehny.example');
     expect(
-      api.sitePage('u.php', queryParameters: {'n': 'sara_99'}).toString(),
+      api.publicProfileUri('sara_99').toString(),
       'https://stage.sarehny.example/u.php?n=sara_99',
     );
+    expect(() => api.publicProfileUri('../admin'), throwsA(isA<ApiException>()));
+    expect(() => api.publicProfileUri(''), throwsA(isA<ApiException>()));
   });
 
-  test('site page resolver rejects path traversal and arbitrary paths', () {
-    final api = ApiClient(baseUrl: 'https://stage.sarehny.example/api/v1/');
-
-    expect(() => api.sitePage('../admin.php'), throwsA(isA<ApiException>()));
-    expect(() => api.sitePage('https://other.example/admin.php'), throwsA(isA<ApiException>()));
-  });
-
-  test('default site pages resolve to the original Sarehny production site', () {
+  test('default profile links point to the original Sarehny site', () {
     final api = ApiClient();
 
-    expect(api.sitePage('index.php').toString(), 'https://sarehny.com/index.php');
+    expect(api.publicProfileUri('sara_99').toString(), 'https://sarehny.com/u.php?n=sara_99');
   });
 }

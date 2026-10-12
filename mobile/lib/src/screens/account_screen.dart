@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import '../api_client.dart';
 import '../app_theme.dart';
 import '../models.dart';
-import '../site_browser.dart';
+import '../native_platform.dart';
+import 'native_site_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key, required this.api, required this.user, required this.onLogout, required this.onUserUpdated});
@@ -220,18 +221,6 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Future<void> _openSitePage(String path) async {
-    try {
-      await SiteBrowser.open(widget.api, path);
-    } on PlatformException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'تعذّر فتح صفحة الموقع داخل التطبيق.')));
-    } on ApiException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
-    }
-  }
-
-  Future<void> _openAdmin() => _openSitePage(SitePagePaths.admin);
-
   Future<void> _selectAvatar() async {
     if (_updating) return;
     setState(() => _updating = true);
@@ -365,11 +354,11 @@ class _AccountScreenState extends State<AccountScreen> {
         ListTile(leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error), title: Text('حذف الحساب نهائيًا', style: TextStyle(color: Theme.of(context).colorScheme.error)), subtitle: const Text('يتطلب تأكيد اسم المستخدم وكلمة المرور'), onTap: _updating ? null : _deleteAccount),
         if (widget.user.isAdmin) ...[
           const Divider(height: 1, indent: 16, endIndent: 16),
-          ListTile(leading: Icon(Icons.admin_panel_settings_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('لوحة الإدارة'), subtitle: const Text('تُفتح داخل التطبيق مع التحقق من صلاحية الموقع'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _openAdmin),
+          ListTile(leading: Icon(Icons.admin_panel_settings_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('لوحة الإدارة'), subtitle: const Text('تحتاج واجهات إدارة أصلية وAPI بصلاحيات محددة'), trailing: const Icon(Icons.chevron_left_rounded), onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NativeFeatureUnavailableScreen(title: 'لوحة الإدارة', detail: 'لا يوفر API الحالي عمليات إدارة Flutter. يلزم تنفيذ كل أداة مع فحوص دور المدير وCSRF واختبارها على staging قبل إتاحتها.')))),
         ],
       ])),
       const SizedBox(height: 16),
-      Card(child: ListTile(leading: Icon(Icons.tune_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('إعدادات الاستقبال والخصوصية'), subtitle: const Text('إدارة ميزات الحساب من صفحة الموقع الأصلية'), trailing: const Icon(Icons.open_in_new_rounded), onTap: _updating ? null : () => _openSitePage(SitePagePaths.account))),
+      Card(child: ListTile(leading: Icon(Icons.tune_rounded, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('إعدادات الاستقبال والخصوصية'), subtitle: const Text('تحتاج مسارات API أصلية لحفظ تفضيلاتك'), trailing: const Icon(Icons.chevron_left_rounded), onTap: _updating ? null : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NativeFeatureUnavailableScreen(title: 'إعدادات الاستقبال والخصوصية', detail: 'لا يتضمن API الحالي مسارات لقراءة أو حفظ إعدادات الاستقبال والخصوصية. لم أضف مفاتيح لا تحفظ تغييرات حقيقية.'))))),
       const SizedBox(height: 16),
       Card(child: ListTile(leading: Icon(Icons.auto_awesome_outlined, color: Theme.of(context).extension<SarehnyPalette>()!.primary), title: const Text('تحليل الشخصية'), subtitle: const Text('وفق ميزات وحصص الموقع الحالية'), trailing: _analyzing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.chevron_left_rounded), onTap: _analyzing ? null : _analyze)),
       const SizedBox(height: 16),
